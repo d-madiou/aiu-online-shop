@@ -1,57 +1,123 @@
-import React from 'react';
-import { FaHeart, FaMoneyBillWaveAlt, FaSortAlphaDownAlt, FaStar } from 'react-icons/fa';
-import { FaMessage } from 'react-icons/fa6';
-import { IoStorefrontSharp } from 'react-icons/io5';
-import { useDispatch } from 'react-redux';
-import { addToCart } from '../redux/cartSlice';
+"use client";
+import { FaHeart, FaShoppingCart, FaStar } from "react-icons/fa";
+import { IoStorefrontSharp } from "react-icons/io5";
+import { Link } from "react-router-dom";
+import { supabase } from "../supabase-client"; // Your Supabase client
 
+const ProductCard = ({ product, store }) => {
+  const SUPABASE_STORAGE_URL =
+    "https://jfcryqngtblpjdudbcyn.supabase.co/storage/v1/object/public/store-images/";
 
-const ProductCard = ({product}) =>{
-    const dispatch = useDispatch();
-    const handleAddToCart = (e, product)=>{
-        e.stopPropagation()
-        e.preventDefault()
-        dispatch(addToCart(product))
+  const handleAddToCart = async (e, product) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert("Please log in to add to cart.");
+      return;
     }
-    return (
-            <div className="max-w-xs bg-white border border-gray-200 rounded-lg group">
-                <div className="p-4">
-                    <div className="flex justify-between items-start">
-                        <span className="bg-green-500 text-white text-xs font-semibold mr-2 px-2.5 py-0.5 rounded">NEW</span>
-                        <div className="flex space-x-2">
-                            <button className="text-gray-400 opacity-100 lg:hover:text-blue-700 lg:opacity-0 group-hover:opacity-100 lg:transition-opacity lg:duration-300">
-                                <FaHeart />
-                            </button>
-                            <button className="text-gray-400 opacity-100 lg:hover:text-blue-700 lg:opacity-0 group-hover:opacity-100 lg:transition-opacity lg:duration-300">
-                                <FaMessage />
-                            </button>
-                            <button className="text-gray-400 hover:text-gray-600">
-                                <FaSortAlphaDownAlt/>
-                            </button>
-                        </div>
-                    </div>
-                    <img alt="Laptop displaying Windows 11 screen" className="w-full h-28 object-cover mt-4" height="100" src={product.image} width="200"/>
-                    <div className="mt-4">
-                        <h3 className="text-gray-500 flex justify-between text-xs uppercase">{product.shop}<IoStorefrontSharp className='relative -bottom-0.5 text-gray-400'/></h3>
-                        <h2 className="text-gray-900 text-lg font-semibold hover:cursor-pointer hover:text-blue-800">{product.name}</h2>
-                        <div className="flex items-center mt-2">
-                            <div className="flex items-center">
-                                <FaStar className='text-yellow-400'/>
-                                <FaStar className='text-yellow-400'/>
-                                <FaStar className='text-yellow-400'/>
-                                <FaStar className='text-yellow-400'/>
-                            </div>
-                        </div>
-                        <p className="text-blue-600 flex justify-between text-sxl lowercase font-bold mt-2">{product.price + "RM"}<FaMoneyBillWaveAlt className='relative -bottom-1.5 text-gray-400'/></p>
-                        <button className="w-full bg-blue-600 text-white text-sm cursor-pointer font-semibold py-2 rounded-lg mt-1 
-                            lg:transform lg:transition-all lg:duration-600 lg:group-hover:translate-y-3 lg:hover:bg-blue-700 
-                            opacity-100 lg:opacity-0 group-hover:opacity-100" onClick={(e) => handleAddToCart(e, product)}>
-                            ADD TO CART
-                        </button>
-                    </div>
-                </div>
-            </div>
-    );
-}
+
+    // Check if the product already exists in the cart
+    const { data: existingItem } = await supabase
+      .from("cart")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("product_id", product.id)
+      .single();
+
+    if (existingItem) {
+      // Update quantity
+      await supabase
+        .from("cart")
+        .update({ quantity: existingItem.quantity + 1 })
+        .eq("id", existingItem.id);
+    } else {
+      // Insert new cart item
+      await supabase.from("cart").insert([
+        {
+          user_id: user.id,
+          product_id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          image: product.image,
+        },
+      ]);
+    }
+  };
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
+      {/* Product Image with Link to Details */}
+      <Link to={`/product/${product.id}`} className="block relative overflow-hidden">
+        <img
+          src={product.image || "/placeholder.svg"}
+          alt={product.name}
+          className="w-full h-48 object-cover transition-transform duration-500 hover:scale-105"
+        />
+        <span className="absolute top-2 left-2 bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded">
+          NEW
+        </span>
+
+        <div className="absolute top-2 right-2 flex flex-col space-y-2">
+          <button className="bg-white p-1.5 rounded-full text-gray-500 hover:text-blue-600 transition-colors duration-300 shadow-sm">
+            <FaHeart size={14} />
+          </button>
+        </div>
+      </Link>
+
+      {/* Product Details */}
+      <div className="p-4">
+        <div className="flex justify-between items-start mb-1">
+          <div className="text-xs text-gray-500 flex items-center">
+            {store?.image_url ? (
+              <Link to={`/store/${store.id}`} className="flex items-center">
+                <img
+                  src={`${SUPABASE_STORAGE_URL}${store.image_url}`}
+                  alt={store.name}
+                  className="w-6 h-6 rounded-full object-cover mr-2"
+                />
+                <span className="hover:text-blue-800 transition-colors duration-200">
+                  {store.name}
+                </span>
+              </Link>
+            ) : (
+              <p className="flex items-center">
+                <IoStorefrontSharp className="mr-1" />
+                {store?.name || "Unknown Store"}
+              </p>
+            )}
+          </div>
+          <div className="flex">
+            {[...Array(4)].map((_, i) => (
+              <FaStar key={i} className="text-yellow-400 text-xs" />
+            ))}
+          </div>
+        </div>
+
+        <Link to={`/product/${product.id}`}>
+          <h2 className="text-gray-900 font-medium line-clamp-2 h-12 hover:text-blue-800 transition-colors duration-200">
+            {product.name}
+          </h2>
+          <p className="text-gray-500 text-sm mt-1 line-clamp-2">
+            {product.description}
+          </p>
+        </Link>
+        <div className="flex justify-between items-center mt-3">
+          <p className="text-blue-600 font-bold">{product.price} RM</p>
+
+          <button
+            onClick={(e) => handleAddToCart(e, product)}
+            className="bg-blue-600 text-white p-2 rounded-full hover:bg-blue-700 transition-colors duration-300"
+            aria-label="Add to cart"
+          >
+            <FaShoppingCart size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default ProductCard;
