@@ -1,10 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { FaBars, FaEdit, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaBars, FaEdit, FaPlus, FaTrash, FaTruck } from 'react-icons/fa';
 import { Sidebar } from '../components/Sidebar';
-import { SellersTable } from '../components/SuperAdmin/SellersTable';
-import { SuperAdminStats } from '../components/SuperAdmin/StatsCard';
-import { StoresTable } from '../components/SuperAdmin/StoresTable';
-import { UsersTable } from '../components/SuperAdmin/UsersTable';
 import { supabase } from '../supabase-client';
 
 function Dashboard() {
@@ -14,111 +10,66 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [user, setUser] = useState(null);
-
-  // Product form states
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [image, setImage] = useState('');
+ 
 
-    // Super Admin states
-    const [users, setUsers] = useState([]);
-    const [stores, setStores] = useState([]);
-    const [sellers, setSellers] = useState([]);
-    const [stats, setStats] = useState({
-      totalUsers: 0,
-      totalStores: 0,
-      totalSellers: 0
-    });
-    const [superAdminLoading, setSuperAdminLoading] = useState(false);
-    const [superAdminError, setSuperAdminError] = useState(null);
 
-  // Fetch super admin data
   useEffect(() => {
-    const fetchSuperAdminData = async () => {
+    const fetchOrders = async () => {
       try {
-        setSuperAdminLoading(true);
-        setSuperAdminError(null);
+        setOrdersLoading(true);
+        setOrdersError(null);
+        if (!user) return;
 
-        // Fetch users
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('*');
-
-        if (usersError) throw usersError;
-
-        // Fetch stores
-        const { data: storesData, error: storesError } = await supabase
-          .from('stores')
-          .select('*');
-
-        if (storesError) throw storesError;
-
-        // Fetch sellers
-        const { data: sellersData, error: sellersError } = await supabase
+        const { data: seller, error: sellerError } = await supabase
           .from('sellers')
-          .select('*');
+          .select('store_id')
+          .eq('user_id', user.id)
+          .single();
 
-        if (sellersError) throw sellersError;
+        if (sellerError || !seller) {
+          setOrdersError('You need to create a store first');
+          return;
+        }
 
-        // Fetch stats
-        const { count: totalUsers } = await supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true });
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select(`*, order_items:order_items(*, product:product_id(*)), shipping_info:shipping_info_id(*)`);
 
-        const { count: totalStores } = await supabase
-          .from('stores')
-          .select('*', { count: 'exact', head: true });
+        if (ordersError) throw ordersError;
 
-        const { count: totalSellers } = await supabase
-          .from('sellers')
-          .select('*', { count: 'exact', head: true });
+        const filteredOrders = (ordersData || []).filter(order =>
+          order.order_items.some(item => item.product?.store_id === seller.store_id)
+        );
 
-        setUsers(usersData || []);
-        setStores(storesData || []);
-        setSellers(sellersData || []);
-        setStats({ totalUsers, totalStores, totalSellers });
-
+        setOrders(filteredOrders);
       } catch (err) {
-        setSuperAdminError(err.message);
+        setOrdersError(err.message);
       } finally {
-        setSuperAdminLoading(false);
+        setOrdersLoading(false);
       }
-    }
-    fetchSuperAdminData();
-  }, []);
-  // Handle user deletion
-  const handleDeleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    };
+    if (user && active === 'orders') fetchOrders();
+  }, [user, active]);
+
+  const handleOrderAction = async (orderId, newStatus) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .delete()
-        .eq('id', userId);
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
       if (error) throw error;
-      setUsers(prev => prev.filter(user => user.id !== userId));
+      setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
     } catch (err) {
-      alert('Error deleting user: ' + err.message);
-    }
-  };
-  // Handle store deletion
-  const handleDeleteStore = async (storeId) => {
-    if (!window.confirm('Are you sure you want to delete this store?')) return;
-    try {
-      const { error } = await supabase
-        .from('stores')
-        .delete()
-        .eq('id', storeId);
-      if (error) throw error;
-      setStores(prev => prev.filter(store => store.id !== storeId));
-    } catch (err) {
-      alert('Error deleting store: ' + err.message);
+      alert('Error updating order: ' + err.message);
     }
   };
 
-  // Get current user
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -127,19 +78,13 @@ function Dashboard() {
     getUser();
   }, []);
 
-  // Fetch user's products
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
         setError(null);
+        if (!user) return;
 
-        if (!user) {
-          setError('Authentication required');
-          return;
-        }
-
-        // Get user's store ID
         const { data: seller, error: sellerError } = await supabase
           .from('sellers')
           .select('store_id')
@@ -151,7 +96,6 @@ function Dashboard() {
           return;
         }
 
-        // Get products for this store
         const { data: productsData, error: productsError } = await supabase
           .from('products')
           .select('*')
@@ -159,14 +103,12 @@ function Dashboard() {
 
         if (productsError) throw productsError;
         setProducts(productsData || []);
-
       } catch (err) {
         setError(err.message);
       } finally {
         setLoading(false);
       }
     };
-
     if (user) fetchProducts();
   }, [user]);
 
@@ -178,7 +120,6 @@ function Dashboard() {
         throw new Error('Please fill all required fields');
       }
 
-      // Get user's store ID
       const { data: seller } = await supabase
         .from('sellers')
         .select('store_id')
@@ -189,27 +130,13 @@ function Dashboard() {
 
       const { error } = await supabase
         .from('products')
-        .insert([{ 
-          name, 
-          description, 
-          category, 
-          price: parseFloat(price), 
-          quantity: parseInt(quantity), 
-          image,
-          store_id: seller.store_id 
-        }]);
+        .insert([{ name, description, category, price: parseFloat(price), quantity: parseInt(quantity), image, store_id: seller.store_id }]);
 
       if (error) throw error;
 
-      // Refresh products
-      const { data: newProducts } = await supabase
-        .from('products')
-        .select('*')
-        .eq('store_id', seller.store_id);
-
+      const { data: newProducts } = await supabase.from('products').select('*').eq('store_id', seller.store_id);
       setProducts(newProducts || []);
       resetForm();
-
     } catch (err) {
       alert(err.message);
       console.error(err);
@@ -218,7 +145,6 @@ function Dashboard() {
 
   const handleDeleteProduct = async (productId) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
-    
     try {
       const { data: seller } = await supabase
         .from('sellers')
@@ -233,7 +159,6 @@ function Dashboard() {
         .eq('store_id', seller.store_id);
 
       if (error) throw error;
-
       setProducts(prev => prev.filter(p => p.id !== productId));
     } catch (err) {
       alert('Error deleting product: ' + err.message);
@@ -249,14 +174,18 @@ function Dashboard() {
     setImage('');
   };
 
-  if (loading) {
-    return <div className="p-4">Loading products...</div>;
-  }
-
-  if (error) {
-    return <div className="p-4 text-red-500">Error: {error}</div>;
-  }
-
+  if (loading) return <div className="p-4">Loading products...</div>;
+  if (error) return <div className="p-4 text-red-500">Error: {error}</div>;
+  const getStatusClass = (status) => {
+    switch (status.toLowerCase()) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'accepted': return 'bg-green-100 text-green-800';
+      case 'on_the_way': return 'bg-blue-100 text-blue-800';
+      case 'delivered': return 'bg-purple-100 text-purple-800';
+      case 'declined': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-gray-100">
       <Sidebar
@@ -436,15 +365,109 @@ function Dashboard() {
               </div>
             </>
           )}
-           {active === "superAdmin" && (
-            <div className="space-y-6">
-              <SuperAdminStats stats={stats} />
-              <UsersTable users={users} onDeleteUser={handleDeleteUser} />
-              <StoresTable stores={stores} users={users} onDeleteStore={handleDeleteStore} />
-              <SellersTable sellers={sellers} stores={stores} />
-              
-            </div>
-          )}
+          
+          {active === "orders" ? (
+    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className="px-4 md:px-6 py-4 border-b border-gray-200">
+        <h2 className="text-lg font-medium">Recent Orders</h2>
+      </div>
+      {ordersLoading ? (
+        <div className="p-4">Loading orders...</div>
+      ) : ordersError ? (
+        <div className="p-4 text-red-500">{ordersError}</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            {/* Table headers remain the same */}
+            <tbody className="bg-white divide-y divide-gray-200">
+              {orders.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="px-4 md:px-6 py-6 text-center text-gray-500">
+                    No orders found
+                  </td>
+                </tr>
+              ) : (
+                orders.map((order) => (
+                  <tr key={order.id} className="hover:bg-gray-50">
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        #{order.id.slice(0, 8)}
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {order.shipping_info?.first_name} {order.shipping_info?.last_name}
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(order.created_at).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        RM {order.total_price.toFixed(2)}
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {order.shipping_info?.address}
+                        {order.shipping_info?.exact_place && `, ${order.shipping_info.exact_place}`}
+                      </div>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${getStatusClass(order.status)}`}>
+                        {order.status === 'on_the_way' && <FaTruck className="mr-1" />}
+                        {order.status}
+                      </span>
+                    </td>
+                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {order.status === 'pending' && (
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs md:text-sm"
+                            onClick={() => handleOrderAction(order.id, 'accepted')}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-xs md:text-sm"
+                            onClick={() => handleOrderAction(order.id, 'declined')}
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )}
+                      {order.status === 'accepted' && (
+                        <button
+                          className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
+                          onClick={() => handleOrderAction(order.id, 'on_the_way')}
+                        >
+                          Mark On The Way
+                        </button>
+                      )}
+                      {order.status === 'on_the_way' && (
+                        <button
+                          className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
+                          onClick={() => handleOrderAction(order.id, 'delivered')}
+                        >
+                          Mark Delivered
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  ) : (
+    <p>End</p>
+  )}
+ 
         </main>
       </div>
     </div>

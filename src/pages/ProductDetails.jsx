@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { FaArrowLeft, FaEnvelope, FaShoppingCart } from "react-icons/fa"
+import { useDispatch } from "react-redux"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../supabase-client"
 
@@ -54,7 +55,7 @@ const ProductDetails = () => {
   
     const { data, error } = await supabase
       .from("cart")
-      .upsert(
+      .insert(
         {
           user_id: userId,
           product_id: product.id,
@@ -68,19 +69,41 @@ const ProductDetails = () => {
   
     if (error) {
       console.error("Error adding to cart:", error.message)
-      alert("Failed to add product to cart.")
+      alert("Failed to add product to cart. it sems your product is already in the cart")
     } else {
-      alert("Product added to cart!")
       // Optionally dispatch to Redux if you want local state sync:
       dispatch(addToCart({ ...product, quantity }))
+
     }
   }
   
-
-  const handleContactSeller = () => {
-    // This would typically open a contact form or chat
-    alert(`Contact the seller about: ${product?.name}`)
+  //let's fetch the seller's contact information 
+  const handleContactSeller = async () => {
+    const sellerId = product?.seller_id
+  
+    const { data: sellerData, error: sellerError } = await supabase
+      .from("stores")
+      .select("phone_number")
+      .eq("id", sellerId)
+      .single()
+  
+    if (sellerError) {
+      console.error("Error fetching seller contact:", sellerError)
+      alert("Unable to contact seller at the moment.")
+      return
+    }
+  
+    const phoneNumber = sellerData.phone_number?.replace(/\s+/g, '') // Clean any spaces
+  
+    if (phoneNumber) {
+      // Open WhatsApp chat
+      const whatsappUrl = `https://wa.me/${phoneNumber}`
+      window.open(whatsappUrl, "_blank")
+    } else {
+      alert("Seller contact number is not available.")
+    }
   }
+  
 
   const incrementQuantity = () => {
     if (product && quantity < product.quantity) {

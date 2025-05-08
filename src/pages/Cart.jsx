@@ -195,11 +195,18 @@ const Cart = () => {
                   </div>
                 </div>
 
-                <button
-                  className="w-full bg-blue-800 text-white py-3 rounded-md font-medium hover:bg-blue-700 transition-colors duration-200"
-                  onClick={() => setIsCheckoutModalOpen(true)}
+                // In your Cart component's Proceed to Checkout button
+                <button 
+                  className='w-full bg-yellow-500 text-white py-2 hover:bg-red-800'
+                  onClick={() => navigate("/checkout", { 
+                    state: { 
+                      products: cartItems,
+                      totalPrice: totalPrice,
+                      totalQuantity: totalQuantity
+                    }
+                  })}
                 >
-                  Proceed to Checkout
+                  Proceed to checkout
                 </button>
               </div>
             </div>
