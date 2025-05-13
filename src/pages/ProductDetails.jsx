@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react"
 import { FaArrowLeft, FaEnvelope, FaShoppingCart } from "react-icons/fa"
-import { useDispatch } from "react-redux"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../supabase-client"
+import { toast } from "react-toastify"
+import 'react-toastify/dist/ReactToastify.css';
 
 const ProductDetails = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const dispatch = useDispatch()
   const [product, setProduct] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -47,37 +47,44 @@ const ProductDetails = () => {
     } = await supabase.auth.getSession()
   
     if (sessionError || !session) {
-      alert("You must be logged in to add items to your cart.")
+      toast.error("Please log in to add to cart.", {
+        position: "top-center",
+        autoClose: 3000,
+      })
       return
     }
   
     const userId = session.user.id
   
     const { data, error } = await supabase
-      .from("cart")
-      .insert(
-        {
-          user_id: userId,
-          product_id: product.id,
-          quantity,
-          price: product.price,
-          name: product.name,
-          image: product.image,
-        },
-        { onConflict: ["user_id", "product_id"] }
+  .from("cart")
+  .upsert({
+    user_id: userId,
+    product_id: product.id,
+    quantity,
+    price: product.price,
+    name: product.name,
+    image: product.image,
+  }, { onConflict: ['user_id', 'product_id'] }// optional if you defined unique constraint
+
+        
       )
+      toast.success("Added to cart!", {
+        position: "top-center",
+        autoClose: 3000,
+      })
   
     if (error) {
       console.error("Error adding to cart:", error.message)
-      alert("Failed to add product to cart. it sems your product is already in the cart")
+      toast.error("Error adding to cart. Please try again.", {
+        position: "top-center",
+        autoClose: 3000,
+      })
     } else {
-      // Optionally dispatch to Redux if you want local state sync:
-      dispatch(addToCart({ ...product, quantity }))
-
+     
     }
   }
   
-  //let's fetch the seller's contact information 
   const handleContactSeller = async () => {
     const sellerId = product?.seller_id
   
@@ -93,14 +100,16 @@ const ProductDetails = () => {
       return
     }
   
-    const phoneNumber = sellerData.phone_number?.replace(/\s+/g, '') // Clean any spaces
+    const phoneNumber = sellerData.phone_number?.replace(/\s+/g, '') 
   
     if (phoneNumber) {
-      // Open WhatsApp chat
       const whatsappUrl = `https://wa.me/${phoneNumber}`
       window.open(whatsappUrl, "_blank")
     } else {
-      alert("Seller contact number is not available.")
+      toast.error("Seller's contact number is not available.", {
+        position: "top-center",
+        autoClose: 3000,
+      })
     }
   }
   

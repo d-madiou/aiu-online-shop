@@ -9,6 +9,8 @@ import Home from "./pages/Home";
 import Order from "./pages/Order";
 import ProductDetails from "./pages/ProductDetails";
 import Shop from "./pages/Shop";
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import SuperAdmin from "./pages/SuperAdmin";
 
 function ScrollToTop() {
@@ -35,7 +37,12 @@ function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/order/:id" element={<Order />} />
         <Route path="/filter-data" element={<FilterData />} />
+         
       </Routes>
+      <ToastContainer
+        position="top-center"
+        
+      />
     </>
   );
 }

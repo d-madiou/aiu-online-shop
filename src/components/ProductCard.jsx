@@ -1,10 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { FaHeart, FaPlus, FaStar } from "react-icons/fa"
+import { FaHeart, FaPlus } from "react-icons/fa"
 import { IoStorefrontSharp } from "react-icons/io5"
 import { Link } from "react-router-dom"
-import { supabase } from "../supabase-client"; // Your Supabase client
+import { supabase } from "../supabase-client"
+import { toast } from "react-toastify"
+import 'react-toastify/dist/ReactToastify.css'
 
 const ProductCard = ({ product, store }) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false)
@@ -18,16 +20,18 @@ const ProductCard = ({ product, store }) => {
     setIsAddingToCart(true)
 
     try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const { data, error } = await supabase.auth.getUser()
+      const user = data?.user
+
       if (!user) {
-        alert("Please log in to add to cart.")
+        toast.error("Please log in to add to cart.", {
+          position: "top-center",
+          autoClose: 5000,
+        })
         setIsAddingToCart(false)
         return
       }
 
-      // Check if the product already exists in the cart
       const { data: existingItem } = await supabase
         .from("cart")
         .select("*")
@@ -36,13 +40,11 @@ const ProductCard = ({ product, store }) => {
         .single()
 
       if (existingItem) {
-        // Update quantity
         await supabase
           .from("cart")
           .update({ quantity: existingItem.quantity + 1 })
           .eq("id", existingItem.id)
       } else {
-        // Insert new cart item
         await supabase.from("cart").insert([
           {
             user_id: user.id,
@@ -55,14 +57,13 @@ const ProductCard = ({ product, store }) => {
         ])
       }
 
-      // Show success feedback
-      const originalBgColor = e.target.style.backgroundColor
-      e.target.style.backgroundColor = "#10B981" // Green success color
-      setTimeout(() => {
-        e.target.style.backgroundColor = originalBgColor
-      }, 500)
+      toast.success("Added to cart!", {
+        position: "top-right",
+        autoClose: 3000,
+      })
     } catch (error) {
       console.error("Error adding to cart:", error)
+      toast.error("Something went wrong. Please try again.")
     } finally {
       setIsAddingToCart(false)
     }
@@ -71,14 +72,14 @@ const ProductCard = ({ product, store }) => {
   const toggleFavorite = (e) => {
     e.stopPropagation()
     e.preventDefault()
-    setIsFavorite(!isFavorite)
+    setIsFavorite((prev) => !prev)
   }
 
   return (
     <div className="bg-white rounded-md shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col overflow-hidden">
       {/* Product Image */}
       <Link to={`/product/${product.id}`} className="block relative">
-        <div className="aspect-square bg-gray-100 overflow-hidden ">
+        <div className="aspect-square bg-gray-100 overflow-hidden">
           <img
             src={product.image || "/placeholder.svg"}
             alt={product.name}
@@ -114,7 +115,7 @@ const ProductCard = ({ product, store }) => {
 
       {/* Product Details */}
       <div className="p-3 flex flex-col flex-grow">
-        {/* Store info */}
+        {/* Store Info */}
         <div className="flex justify-between items-center mb-1">
           <div className="text-xs text-gray-500 flex items-center truncate max-w-[70%]">
             {store?.image_url ? (
@@ -124,7 +125,9 @@ const ProductCard = ({ product, store }) => {
                   alt={store.name}
                   className="w-4 h-4 rounded-full object-cover mr-1"
                 />
-                <span className="group-hover:text-blue-800 transition-colors duration-200 truncate">{store?.name}</span>
+                <span className="group-hover:text-blue-800 transition-colors duration-200 truncate">
+                  {store?.name}
+                </span>
               </Link>
             ) : (
               <span className="flex items-center truncate">
@@ -133,23 +136,16 @@ const ProductCard = ({ product, store }) => {
               </span>
             )}
           </div>
-
-          {/* Rating */}
-          <div className="flex">
-            {[...Array(5)].map((_, i) => (
-              <FaStar key={i} className={i < (product.rating || 4) ? "text-yellow-400" : "text-gray-200"} size={10} />
-            ))}
-          </div>
         </div>
 
-        {/* Product name */}
+        {/* Product Name */}
         <Link to={`/product/${product.id}`} className="group">
           <h2 className="text-sm font-medium text-gray-800 group-hover:text-blue-800 transition-colors duration-200 line-clamp-2 mb-1">
             {product.name}
           </h2>
         </Link>
 
-        {/* Price and add to cart */}
+        {/* Price and Add to Cart */}
         <div className="flex justify-between items-center mt-auto pt-2">
           <div>
             <span className="text-blue-800 font-bold text-sm">RM {product.price?.toFixed(2)}</span>
@@ -171,12 +167,12 @@ const ProductCard = ({ product, store }) => {
                 fill="none"
                 viewBox="0 0 24 24"
               >
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path
                   className="opacity-75"
                   fill="currentColor"
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
+                />
               </svg>
             ) : (
               <FaPlus size={12} />

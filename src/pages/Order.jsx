@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { FaBox, FaCheck, FaClock, FaFileInvoice, FaShippingFast, FaTimes, FaTrash, FaTruck } from "react-icons/fa"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../supabase-client"
+import { toast } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
 
 const Order = () => {
   const navigate = useNavigate()
@@ -18,7 +20,7 @@ const Order = () => {
       try {
         setLoading(true)
 
-        // Fetch the order from Supabase
+        
         const { data, error } = await supabase
           .from("orders")
           .select(`
@@ -30,7 +32,7 @@ const Order = () => {
 
         if (error) throw error
 
-        // Fetch order items
+   
         const { data: orderItems, error: itemsError } = await supabase
           .from("order_items")
           .select(`
@@ -41,27 +43,27 @@ const Order = () => {
 
         if (itemsError) throw itemsError
 
-        // Combine order with items
+       
         setOrder({
           ...data,
           products: orderItems.map((item) => ({
             ...item.product,
             quantity: item.quantity,
           })),
-          // Default to "pending" if status is not set
+          
           status: data.status || "pending",
         })
       } catch (err) {
         console.error("Error fetching order:", err)
         setError(err.message)
 
-        // For demo purposes, create a mock order if real one can't be fetched
+        
         setOrder({
           id: id || "ORD-" + Math.floor(10000 + Math.random() * 90000),
           created_at: new Date().toISOString(),
           total_price: 249.98,
           payment_method: "Cash On Delivery",
-          status: "pending", // or "accepted" or "declined" or "delivered"
+          status: "pending", 
           shipping_info: {
             first_name: "John",
             last_name: "Doe",
@@ -95,7 +97,6 @@ const Order = () => {
     fetchOrder()
   }, [id])
 
-  // Function to completely remove the order from the database
   const handleClearOrder = async () => {
     if (!window.confirm("Are you sure you want to permanently delete this order? This action cannot be undone.")) {
       return
@@ -104,7 +105,7 @@ const Order = () => {
     try {
       setIsDeleting(true)
 
-      // Delete related data in sequence
+      
       const { error: itemsError } = await supabase
         .from('order_items')
         .delete()
@@ -126,13 +127,17 @@ const Order = () => {
 
       if (orderError) throw orderError
 
-      // Clear local state and redirect
+      
       setOrder(null)
       navigate('/shop', { replace: true, state: { orderDeleted: true } })
 
     } catch (err) {
       console.error("Error deleting order:", err)
-      alert("Failed to delete order: " + err.message)
+      toast.error("Failed to delete order. Please try again.", {
+        position: "top-center",
+        autoClose: 5000,
+      })
+
     } finally {
       setIsDeleting(false)
     }
@@ -164,8 +169,6 @@ const Order = () => {
       </div>
     )
   }
-  // if empty order
-  // Check if order is empty or null
 
   if (!order) {
     return (
@@ -240,22 +243,22 @@ const Order = () => {
     }
   }
 
-  // Determine if we should show the delivery tracking section
   const showDeliveryTracking = ["accepted", "on the way", "delivered"].includes(order.status.toLowerCase())
 
-  // Determine if we should show the clear order button
   const showClearButton = order.status.toLowerCase() === "declined"
 
   return (
     <div className="container mx-auto py-12 px-4">
-      <div className="mb-6">
+      <div className="mb-6 flex justify-between items-center">
         <button onClick={() => navigate(-1)} className="text-blue-800 hover:underline flex items-center">
           &larr; Back
         </button>
+        <button className="">Clear all</button>
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        {/* Order Header */}
+        
+        
         <div className="bg-blue-800 text-white p-6">
           <div className="flex flex-col md:flex-row md:justify-between md:items-center">
             <div>

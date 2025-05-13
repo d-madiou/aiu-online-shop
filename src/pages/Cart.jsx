@@ -194,10 +194,8 @@ const Cart = () => {
                     </button>
                   </div>
                 </div>
-
-                // In your Cart component's Proceed to Checkout button
                 <button 
-                  className='w-full bg-yellow-500 text-white py-2 hover:bg-red-800'
+                  className='w-full bg-blue-800 text-white py-2 hover:bg-blue-500'
                   onClick={() => navigate("/checkout", { 
                     state: { 
                       products: cartItems,

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../supabase-client';
 
 function Store({ onStoreCreated }) {
@@ -95,7 +95,6 @@ function Store({ onStoreCreated }) {
 
             if (sellerInsertError) throw sellerInsertError;
 
-            // ✅ All successful
             setIsStoreCreated(true);
             resetForm();
 

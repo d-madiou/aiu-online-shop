@@ -14,6 +14,8 @@ import {
 } from "react-icons/fa"
 import { Link, useNavigate } from "react-router-dom"
 import { supabase } from "../supabase-client"
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const CheckoutPage = () => {
   const navigate = useNavigate()
@@ -138,7 +140,10 @@ const CheckoutPage = () => {
       } = await supabase.auth.getSession()
 
       if (sessionError || !session) {
-        alert("Please log in to place your order.")
+        toast.error("Please log in to place an order.", {
+          position: "top-center",
+          autoClose: 5000,
+        })
         setIsSubmitting(false)
         return
       }
@@ -198,7 +203,11 @@ const CheckoutPage = () => {
 
       if (deleteError) throw deleteError
 
-      // Redirect to order page
+      toast.success("Order placed successfully!", {
+        position: "top-center",
+        autoClose: 5000,
+      })
+
       navigate(`/order/${orderData.id}`)
     } catch (error) {
       console.error("Order processing error:", error)

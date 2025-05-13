@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase-client';
 
@@ -19,7 +19,7 @@ const Register = ({openLogin}) =>{
           password,
           options: {
             data: {
-              full_name: fullName, // This gets stored in the 'user_metadata'
+              full_name: fullName, 
             },
           },
         });
@@ -57,13 +57,13 @@ const Register = ({openLogin}) =>{
                 onChange={(e)=> setPassword(e.target.value)} />
             </div> 
             <div>
-                <button type="submit" className='w-full bg-red-600 text-white py-2'
+                <button type="submit" className='w-full bg-blue-600 text-white py-2'
                 >Sign up</button>
             </div>
         </form>
         <div className='text-center'>
             <span className='text-gray-700'>Already have an account?</span>
-            <button className='text-red-800'
+            <button className='text-blue-800'
             onClick={openLogin}>Login</button>
         </div>
     </div>

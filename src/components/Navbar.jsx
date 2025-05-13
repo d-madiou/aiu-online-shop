@@ -18,10 +18,13 @@ import "../App.css";
 import logoImage from "../assets/Images/logo.png";
 import { setSearchTerm } from "../redux/cartSlice";
 import { supabase } from "../supabase-client";
+import Alert from "./Alert";
 import Login from "./login";
 import Modal from "./Modal";
 import Register from "./register";
 import Store from "./Store";
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 const Navbar = () => {
   const dispatch = useDispatch();
@@ -142,10 +145,19 @@ const Navbar = () => {
       navigate("/");
       // Handle case when user is not logged in or no orders exist
       if (!user) {
-        alert("Please log in to view your orders.");
+        toast.error("Please log in to view your orders.", {
+          position: "top-center",
+          autoClose: 5000,
+        });
+
+        return;
+
       }
       if (orderCount === 0) {
-        alert("No orders found.");
+        toast.error("No orders found.", {
+          position: "top-center",
+          autoClose: 5000,
+        });
       }
     }
   };
@@ -196,6 +208,7 @@ const Navbar = () => {
       </button>
     );
   };
+
 
   return (
     <div className="sticky top-0 z-50">
@@ -339,18 +352,7 @@ const Navbar = () => {
                         <p className="font-semibold">{user.email}</p>
                         <p className="text-xs text-gray-500 mt-1">Manage your account</p>
                       </div>
-                      <Link
-                        to="/profile"
-                        className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 w-full text-left items-center"
-                      >
-                        <FaUser className="mr-3 text-indigo-500" /> Profile
-                      </Link>
-                      <Link
-                        to="/order"
-                        className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gradient-to-r hover:from-indigo-50 hover:to-purple-50 w-full text-left items-center"
-                      >
-                        <FaReceipt className="mr-3 text-indigo-500" /> My Orders
-                      </Link>
+      
                       <button
                         onClick={logout}
                         className="px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full text-left flex items-center"
@@ -464,8 +466,8 @@ const Navbar = () => {
       </nav>
 
       <Modal isModalOpen={isModalOpen} setIsModalOpen={setIsModalOpen}>
-        {modalContent === "login" && <Login openSignUp={() => openModal("register")} />}
-        {modalContent === "register" && <Register openLogin={() => openModal("login")} />}
+        {modalContent === "login" && <Login openSignUp={() => openModal("register")} setIsModalOpen={setIsModalOpen}/>}
+        {modalContent === "register" && <Register openLogin={() => openModal("login")} setIsModalOpen={setIsModalOpen} />}
         {modalContent === "store" && (
           <Store
             onStoreCreated={() => {

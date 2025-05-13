@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { FaBars, FaEdit, FaPlus, FaTrash, FaTruck } from 'react-icons/fa';
 import { Sidebar } from '../components/Sidebar';
 import { supabase } from '../supabase-client';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function Dashboard() {
   const [active, setActive] = useState('products');
@@ -66,7 +68,10 @@ function Dashboard() {
       if (error) throw error;
       setOrders(prev => prev.map(order => order.id === orderId ? { ...order, status: newStatus } : order));
     } catch (err) {
-      alert('Error updating order: ' + err.message);
+      toast.error('Error updating order status: ' + err.message, {
+        position: "top-center",
+        autoClose: 2000,
+      });
     }
   };
 
@@ -136,6 +141,10 @@ function Dashboard() {
 
       const { data: newProducts } = await supabase.from('products').select('*').eq('store_id', seller.store_id);
       setProducts(newProducts || []);
+      toast.success('Product added successfully!', {
+        position: "top-center",
+        autoClose: 2000,
+      });
       resetForm();
     } catch (err) {
       alert(err.message);
@@ -161,7 +170,10 @@ function Dashboard() {
       if (error) throw error;
       setProducts(prev => prev.filter(p => p.id !== productId));
     } catch (err) {
-      alert('Error deleting product: ' + err.message);
+      toast.error('Error deleting product: ' + err.message, {
+        position: "top-center",
+        autoClose: 2000,
+      });
     }
   };
 
@@ -339,7 +351,7 @@ function Dashboard() {
                         <td className="px-4 py-2">{product.quantity}</td>
                         <td className="px-4 py-2 flex space-x-2">
                           <button
-                            className="text-blue-600 hover:text-blue-800"
+                            className="text-blue-600 mb-6 hover:text-blue-800"
                             onClick={() => {
                               setName(product.name);
                               setDescription(product.description);
@@ -352,7 +364,7 @@ function Dashboard() {
                             <FaEdit />
                           </button>
                           <button
-                            className="text-red-600 hover:text-red-800"
+                            className="text-red-600 mb-6 hover:text-red-800"
                             onClick={() => handleDeleteProduct(product.id)}
                           >
                             <FaTrash />
@@ -366,108 +378,109 @@ function Dashboard() {
             </>
           )}
           
-          {active === "orders" ? (
-    <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-      <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-        <h2 className="text-lg font-medium">Recent Orders</h2>
-      </div>
-      {ordersLoading ? (
-        <div className="p-4">Loading orders...</div>
-      ) : ordersError ? (
-        <div className="p-4 text-red-500">{ordersError}</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            {/* Table headers remain the same */}
-            <tbody className="bg-white divide-y divide-gray-200">
-              {orders.length === 0 ? (
-                <tr>
-                  <td colSpan="7" className="px-4 md:px-6 py-6 text-center text-gray-500">
-                    No orders found
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => (
-                  <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        #{order.id.slice(0, 8)}
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {order.shipping_info?.first_name} {order.shipping_info?.last_name}
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {new Date(order.created_at).toLocaleDateString()}
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        RM {order.total_price.toFixed(2)}
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {order.shipping_info?.address}
-                        {order.shipping_info?.exact_place && `, ${order.shipping_info.exact_place}`}
-                      </div>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        ${getStatusClass(order.status)}`}>
-                        {order.status === 'on_the_way' && <FaTruck className="mr-1" />}
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {order.status === 'pending' && (
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs md:text-sm"
-                            onClick={() => handleOrderAction(order.id, 'accepted')}
-                          >
-                            Accept
-                          </button>
-                          <button
-                            className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-xs md:text-sm"
-                            onClick={() => handleOrderAction(order.id, 'declined')}
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      )}
-                      {order.status === 'accepted' && (
-                        <button
-                          className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
-                          onClick={() => handleOrderAction(order.id, 'on_the_way')}
-                        >
-                          Mark On The Way
-                        </button>
-                      )}
-                      {order.status === 'on_the_way' && (
-                        <button
-                          className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
-                          onClick={() => handleOrderAction(order.id, 'delivered')}
-                        >
-                          Mark Delivered
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  ) : (
-    <p>End</p>
-  )}
- 
+                    {active === "orders" ? (
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="px-4 md:px-6 py-4 border-b border-gray-200">
+                  <h2 className="text-lg font-medium">Recent Orders</h2>
+                </div>
+                {ordersLoading ? (
+                  <div className="p-4">Loading orders...</div>
+                ) : ordersError ? (
+                  <div className="p-4 text-red-500">{ordersError}</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      {/* Table headers remain the same */}
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {orders.length === 0 ? (
+                          <tr>
+                            <td colSpan="7" className="px-4 md:px-6 py-6 text-center text-gray-500">
+                              No orders found
+                            </td>
+                          </tr>
+                        ) : (
+                          orders.map((order) => (
+                            <tr key={order.id} className="hover:bg-gray-50">
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">
+                                  #{order.id.slice(0, 8)}
+                                </div>
+                              </td>
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {order.shipping_info?.first_name} {order.shipping_info?.last_name}
+                                </div>
+                              </td>
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {new Date(order.created_at).toLocaleDateString()}
+                                </div>
+                              </td>
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  RM {order.total_price.toFixed(2)}
+                                </div>
+                              </td>
+                              <td className="px-4 md:px-6 py-4">
+                                <div className="text-sm text-gray-900">
+                                  {order.shipping_info?.address}
+                                  {order.shipping_info?.exact_place && `, ${order.shipping_info.exact_place}`}
+                                </div>
+                              </td>
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                  ${getStatusClass(order.status)}`}>
+                                  {order.status === 'on_the_way' && <FaTruck className="mr-1" />}
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                {order.status === 'pending' && (
+                                  <div className="flex justify-end space-x-2">
+                                    <button
+                                      className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs md:text-sm"
+                                      onClick={() => handleOrderAction(order.id, 'accepted')}
+                                    >
+                                      Accept
+                                    </button>
+                                    <button
+                                      className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-xs md:text-sm"
+                                      onClick={() => handleOrderAction(order.id, 'declined')}
+                                    >
+                                      Decline
+                                    </button>
+                                  </div>
+                                )}
+                                {order.status === 'accepted' && (
+                                  <button
+                                    className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
+                                    onClick={() => handleOrderAction(order.id, 'on_the_way')}
+                                  >
+                                    Mark On The Way
+                                  </button>
+                                )}
+                                {order.status === 'on_the_way' && (
+                                  <button
+                                    className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
+                                    onClick={() => handleOrderAction(order.id, 'delivered')}
+                                  >
+                                    Mark Delivered
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 text-gray-500">
+                <p>Select "Manage Products" to add or edit your products.</p>
+              </div>
+            )}
         </main>
       </div>
     </div>
