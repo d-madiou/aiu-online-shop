@@ -1,4 +1,4 @@
-import React, { useEffect } from "react"; // Added React import for useEffect
+import { useEffect } from "react"; // Added React import for useEffect
 import { Route, Routes, useLocation } from "react-router-dom";
 import "./App.css";
 import Cart from "./pages/Cart";
@@ -15,7 +15,7 @@ function ScrollToTop() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    window.scrollTo(0, 0); // Scroll to the top of the page on route change
+    window.scrollTo(0, 0); 
   }, [pathname]);
 
   return null;
@@ -24,7 +24,7 @@ function ScrollToTop() {
 function App() {
   return (
     <>
-      <ScrollToTop /> {/* Moved outside of Routes */}
+      <ScrollToTop /> 
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />
