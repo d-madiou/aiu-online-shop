@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { FaCartPlus, FaRegClock, FaStar } from "react-icons/fa"
 import { Link } from "react-router-dom"
 import { supabase } from "../supabase-client"
+import { toast } from "react-toastify"
+import "react-toastify/dist/ReactToastify.css"
 
 const DealCard = ({ product }) => {
   const [timeLeft, setTimeLeft] = useState({
@@ -57,7 +59,10 @@ const DealCard = ({ product }) => {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) {
-        alert("Please log in to add to cart.")
+        toast.error("Please log in to add to cart.", {
+          position: "top-center",
+          autoClose: 3000,
+        })
         setIsAddingToCart(false)
         return
       }

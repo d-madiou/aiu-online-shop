@@ -53,7 +53,7 @@ const ProductList = () => {
                 <ProductCard 
                     key={product.id} 
                     product={product}
-                    store={product.stores}  // Corrected from storez to stores
+                    store={product.stores}  
                 />
             ))}
         </div>
