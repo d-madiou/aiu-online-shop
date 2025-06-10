@@ -347,13 +347,13 @@ const Navbar = () => {
               >
                 <FaUser className="mr-2" /> About
               </Link>
-              <Link
+              {/* <Link
                 to="/others"
                 className="text-gray-700 hover:text-indigo-600 font-medium transition-colors duration-200 flex items-center relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-indigo-500 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300"
                 aria-label="Others"
               >
                 <FaBook className="mr-2" /> Others
-              </Link>
+              </Link> */}
             </div>
 
             {/* Search and Actions */}

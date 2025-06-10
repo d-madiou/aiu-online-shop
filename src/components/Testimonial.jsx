@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react"
 import { FaChevronLeft, FaChevronRight, FaQuoteLeft, FaStar, FaUser } from "react-icons/fa"
-import ThiernoImage from "../assets/Images/ThiernoImage.png"
 import { supabase } from "../supabase-client"
 
 const Testimonial = () => {
@@ -10,66 +9,75 @@ const Testimonial = () => {
   const [newTestimonial, setNewTestimonial] = useState({
     title: "",
     description: "",
-    name: "",
     rating: 5,
-    image: ThiernoImage,
   })
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [submitting, setSubmitting] = useState(false)
+  const [user, setUser] = useState(null)
   const sliderRef = useRef(null)
 
-  // Fetch data on component mount
+  // Fetch user and testimonials on component mount
   useEffect(() => {
-    fetchTestimonials()
+    const fetchData = async () => {
+      // Get authenticated user
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      
+      // Fetch testimonials
+      await fetchTestimonials()
+    }
+
+    fetchData()
   }, [])
 
   const fetchTestimonials = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase.from("testimo").select("*")
+      const { data, error } = await supabase
+        .from("testimonials")
+        .select(`
+          id,
+          title,
+          description,
+          rating,
+          created_at,
+          user_id,
+          profiles:user_id (email)
+        `)
+        .order('created_at', { ascending: false })
 
-      if (error) {
-        console.error("Error fetching testimonials:", error)
-      } else {
-        // If no testimonials, add some sample ones
-        if (!data || data.length === 0) {
-          setTestimonials([
+      if (error) throw error
+
+      // Format data with email and fallback if empty
+      const formattedData = data?.length > 0 
+        ? data.map(item => ({
+            ...item,
+            email: item.profiles?.email || 'anonymous@example.com'
+          }))
+        : [
             {
               id: 1,
-              title: "Excellent Service",
-              description:
-                "I've been shopping here for months and the service is always top-notch. The products arrive quickly and in perfect condition.",
-              name: "Sarah Johnson",
+              title: "Great Experience",
+              description: "The platform is easy to use and products are delivered quickly.",
               rating: 5,
-              image: ThiernoImage,
+              email: "user1@example.com",
+              created_at: new Date().toISOString()
             },
             {
               id: 2,
-              title: "Great Products",
-              description:
-                "The quality of products on this marketplace is exceptional. I've recommended it to all my friends at AIU.",
-              name: "Michael Chen",
+              title: "Quality Products",
+              description: "I'm impressed with the quality of items available here.",
               rating: 4,
-              image: ThiernoImage,
-            },
-            {
-              id: 3,
-              title: "Fast Delivery",
-              description:
-                "I ordered some snacks for a study session and they arrived within an hour! Incredible service for students.",
-              name: "Aisha Rahman",
-              rating: 5,
-              image: ThiernoImage,
-            },
-          ])
-        } else {
-          setTestimonials(data)
-        }
-      }
+              email: "user2@example.com",
+              created_at: new Date().toISOString()
+            }
+          ]
+
+      setTestimonials(formattedData)
     } catch (error) {
-      console.error("Error:", error)
+      console.error("Error fetching testimonials:", error)
     } finally {
       setLoading(false)
     }
@@ -77,75 +85,75 @@ const Testimonial = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
-    setNewTestimonial((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
+    setNewTestimonial(prev => ({ ...prev, [name]: value }))
   }
 
   const handleRatingChange = (rating) => {
-    setNewTestimonial((prev) => ({
-      ...prev,
-      rating,
-    }))
+    setNewTestimonial(prev => ({ ...prev, rating }))
   }
 
   const addTestimonial = async (e) => {
     e.preventDefault()
-    const { title, description, name, rating, image } = newTestimonial
+    
+    if (!user) {
+      alert("Please sign in to submit a review")
+      return
+    }
 
-    if (!title || !description || !name) {
-      alert("Title, description, and name are required!")
+    const { title, description, rating } = newTestimonial
+
+    if (!title || !description) {
+      alert("Title and description are required!")
       return
     }
 
     setSubmitting(true)
 
     try {
-      const { data, error } = await supabase.from("testimo").insert([
-        { title, description, name, rating, image }, // Ensure your table has these columns
-      ])
-
-      if (error) {
-        console.error("Error adding testimonial:", error)
-        alert("Failed to add testimonial. Please try again.")
-      } else {
-        // If successful, add to local state and reset form
-        const newItem = data?.[0] || {
-          id: Date.now(),
-          title,
-          description,
-          name,
+      const { data, error } = await supabase
+        .from("testimonials")
+        .insert([{ 
+          title, 
+          description, 
           rating,
-          image,
-        }
-        setTestimonials((prev) => [...prev, newItem])
-        setNewTestimonial({
-          title: "",
-          description: "",
-          name: "",
-          rating: 5,
-          image: ThiernoImage,
-        })
-        setShowForm(false)
+          user_id: user.id 
+        }])
+        .select()
+
+      if (error) throw error
+
+      // Update local state with new testimonial
+      const newItem = {
+        ...data[0],
+        email: user.email,
+        profiles: { email: user.email }
       }
+      
+      setTestimonials(prev => [newItem, ...prev])
+      setNewTestimonial({
+        title: "",
+        description: "",
+        rating: 5,
+      })
+      setShowForm(false)
     } catch (error) {
-      console.error("Error:", error)
-      alert("An unexpected error occurred. Please try again.")
+      console.error("Error adding testimonial:", error)
+      alert("Failed to add testimonial. Please try again.")
     } finally {
       setSubmitting(false)
     }
   }
 
+  // Slider navigation functions
   const nextSlide = () => {
     if (testimonials.length <= 1) return
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % testimonials.length)
+    setCurrentIndex(prev => (prev + 1) % testimonials.length)
     scrollToTestimonial((currentIndex + 1) % testimonials.length)
   }
 
   const prevSlide = () => {
     if (testimonials.length <= 1) return
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + testimonials.length) % testimonials.length)
+    setCurrentIndex(prev => (prev - 1 + testimonials.length) % testimonials.length)
     scrollToTestimonial((currentIndex - 1 + testimonials.length) % testimonials.length)
   }
 
@@ -157,31 +165,32 @@ const Testimonial = () => {
   const scrollToTestimonial = (index) => {
     if (sliderRef.current) {
       const testimonialWidth = sliderRef.current.offsetWidth
-      const scrollPosition = index * testimonialWidth
       sliderRef.current.scrollTo({
-        left: scrollPosition,
-        behavior: "smooth",
+        left: index * testimonialWidth,
+        behavior: "smooth"
       })
     }
   }
 
-  // For desktop view, show 3 testimonials at once if available
+  // Get visible testimonials for desktop view
   const getVisibleTestimonials = () => {
     if (testimonials.length <= 3) return testimonials
     
-    const result = []
-    for (let i = 0; i < 3; i++) {
-      const index = (currentIndex + i) % testimonials.length
-      result.push(testimonials[index])
-    }
-    return result
+    return [
+      testimonials[currentIndex % testimonials.length],
+      testimonials[(currentIndex + 1) % testimonials.length],
+      testimonials[(currentIndex + 2) % testimonials.length]
+    ]
   }
 
   return (
-    <div className="container mx-auto py-12">
+    <div className="container mx-auto py-12 px-4">
       <div className="text-center mb-12">
-        <h2 className="text-3xl font-bold mb-4">What Our Customers Say</h2>
-        <div className="h-1 w-24 bg-blue-800 mx-auto"></div>
+        <h2 className="text-3xl font-bold mb-4">Customer Reviews</h2>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          Read what our customers say about their shopping experience
+        </p>
+        <div className="h-1 w-24 bg-blue-800 mx-auto mt-4"></div>
       </div>
 
       {loading ? (
@@ -190,130 +199,121 @@ const Testimonial = () => {
         </div>
       ) : (
         <>
-          {/* Desktop View - Grid of 3 testimonials */}
+          {/* Desktop View - Grid */}
           <div className="hidden md:block">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {getVisibleTestimonials().map((testimonial) => (
-                <div
+                <div 
                   key={testimonial.id}
-                  className="bg-white p-6 rounded-lg shadow-md border border-gray-100 flex flex-col h-full"
+                  className="bg-white p-6 rounded-lg shadow-md border border-gray-100 hover:shadow-lg transition-shadow"
                 >
-                  <div className="mb-4 text-blue-800">
-                    <FaQuoteLeft size={24} />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">{testimonial.title}</h3>
-                  <p className="text-gray-600 mb-4 flex-grow">{testimonial.description}</p>
-                  <div className="flex items-center mt-auto">
-                    <div className="flex-shrink-0 mr-4">
-                      {testimonial.image ? (
-                        <img
-                          src={testimonial.image || "/placeholder.svg"}
-                          alt={testimonial.name}
-                          className="w-12 h-12 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-800">
-                          <FaUser size={20} />
-                        </div>
-                      )}
+                  <div className="flex items-start mb-4">
+                    <div className="text-blue-800 mr-3 mt-1">
+                      <FaQuoteLeft size={20} />
                     </div>
                     <div>
-                      <p className="font-bold text-gray-800">{testimonial.name}</p>
-                      <div className="flex mt-1">
+                      <h3 className="text-lg font-bold">{testimonial.title}</h3>
+                      <div className="flex mt-1 mb-3">
                         {[...Array(5)].map((_, i) => (
                           <FaStar
                             key={i}
-                            className={i < (testimonial.rating || 5) ? "text-yellow-400" : "text-gray-300"}
+                            className={i < testimonial.rating ? "text-yellow-400" : "text-gray-300"}
                             size={14}
                           />
                         ))}
                       </div>
                     </div>
                   </div>
+                  <p className="text-gray-600 mb-6">{testimonial.description}</p>
+                  <div className="flex items-center">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 mr-3">
+                      {testimonial.email.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800">{testimonial.email}</p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(testimonial.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/* Navigation Dots */}
+            {/* Navigation Controls */}
             {testimonials.length > 3 && (
-              <div className="flex justify-center space-x-2 mt-6">
-                {[...Array(Math.ceil(testimonials.length / 3))].map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => goToSlide(i * 3)}
-                    className={`w-3 h-3 rounded-full ${
-                      Math.floor(currentIndex / 3) === i ? "bg-blue-800" : "bg-gray-300"
-                    }`}
-                    aria-label={`Go to slide ${i + 1}`}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Navigation Arrows */}
-            {testimonials.length > 3 && (
-              <div className="flex justify-center mt-6 space-x-4">
+              <div className="flex justify-center items-center mt-6 space-x-4">
                 <button
                   onClick={prevSlide}
-                  className="bg-blue-800 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
-                  aria-label="Previous testimonial"
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label="Previous reviews"
                 >
-                  <FaChevronLeft />
+                  <FaChevronLeft className="text-gray-700" />
                 </button>
+                
+                <div className="flex space-x-2">
+                  {[...Array(Math.ceil(testimonials.length / 3))].map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => goToSlide(i * 3)}
+                      className={`w-2 h-2 rounded-full ${
+                        currentIndex >= i * 3 && currentIndex < (i + 1) * 3 
+                          ? "bg-blue-800" 
+                          : "bg-gray-300"
+                      }`}
+                      aria-label={`Go to page ${i + 1}`}
+                    />
+                  ))}
+                </div>
+                
                 <button
                   onClick={nextSlide}
-                  className="bg-blue-800 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-blue-700 transition-colors"
-                  aria-label="Next testimonial"
+                  className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+                  aria-label="Next reviews"
                 >
-                  <FaChevronRight />
+                  <FaChevronRight className="text-gray-700" />
                 </button>
               </div>
             )}
           </div>
 
-          {/* Mobile View - Horizontal Scrolling */}
+          {/* Mobile View - Carousel */}
           <div className="md:hidden relative">
             <div
               ref={sliderRef}
               className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-6"
-              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+              style={{ scrollbarWidth: "none" }}
             >
-              {testimonials.map((testimonial, index) => (
-                <div
-                  key={testimonial.id}
-                  className="flex-shrink-0 w-full snap-center px-4"
-                >
-                  <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100 flex flex-col h-full">
-                    <div className="mb-4 text-blue-800">
-                      <FaQuoteLeft size={24} />
-                    </div>
-                    <h3 className="text-xl font-bold mb-2">{testimonial.title}</h3>
-                    <p className="text-gray-600 mb-4">{testimonial.description}</p>
-                    <div className="flex items-center mt-auto">
-                      <div className="flex-shrink-0 mr-4">
-                        {testimonial.image ? (
-                          <img
-                            src={testimonial.image || "/placeholder.svg"}
-                            alt={testimonial.name}
-                            className="w-12 h-12 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-800">
-                            <FaUser size={20} />
-                          </div>
-                        )}
+              {testimonials.map((testimonial) => (
+                <div key={testimonial.id} className="flex-shrink-0 w-full snap-center px-2">
+                  <div className="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+                    <div className="flex items-start mb-4">
+                      <div className="text-blue-800 mr-3 mt-1">
+                        <FaQuoteLeft size={20} />
                       </div>
                       <div>
-                        <p className="font-bold text-gray-800">{testimonial.name}</p>
-                        <div className="flex mt-1">
+                        <h3 className="text-lg font-bold">{testimonial.title}</h3>
+                        <div className="flex mt-1 mb-3">
                           {[...Array(5)].map((_, i) => (
                             <FaStar
                               key={i}
-                              className={i < (testimonial.rating || 5) ? "text-yellow-400" : "text-gray-300"}
+                              className={i < testimonial.rating ? "text-yellow-400" : "text-gray-300"}
                               size={14}
                             />
                           ))}
                         </div>
+                      </div>
+                    </div>
+                    <p className="text-gray-600 mb-6">{testimonial.description}</p>
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-800 mr-3">
+                        {testimonial.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-gray-800">{testimonial.email}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(testimonial.created_at).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -321,14 +321,16 @@ const Testimonial = () => {
               ))}
             </div>
 
-            {/* Mobile Navigation Dots */}
-            <div className="flex justify-center space-x-2 mt-4">
+            {/* Mobile Indicators */}
+            <div className="flex justify-center mt-4 space-x-2">
               {testimonials.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => goToSlide(i)}
-                  className={`w-2.5 h-2.5 rounded-full ${currentIndex === i ? "bg-blue-800" : "bg-gray-300"}`}
-                  aria-label={`Go to slide ${i + 1}`}
+                  className={`w-2 h-2 rounded-full ${
+                    currentIndex === i ? "bg-blue-800" : "bg-gray-300"
+                  }`}
+                  aria-label={`Go to review ${i + 1}`}
                 />
               ))}
             </div>
@@ -336,133 +338,121 @@ const Testimonial = () => {
         </>
       )}
 
-      {/* Add Testimonial Button */}
-      <div className="flex justify-center mt-10">
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-blue-800 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition-colors flex items-center"
-        >
-          {showForm ? "Cancel" : "Share Your Experience"}
-        </button>
-      </div>
-
-      {/* Add Testimonial Form */}
-      {showForm && (
-        <div className="mt-8 max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-md border border-gray-200">
-          <h3 className="text-xl font-bold mb-4">Share Your Experience</h3>
-          <form onSubmit={addTestimonial}>
-            <div className="mb-4">
-              <label htmlFor="name" className="block text-gray-700 font-medium mb-2">
-                Your Name*
-              </label>
-              <input
-                type="text"
-                id="name"
-                name="name"
-                value={newTestimonial.name}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter your name"
-                required
-              />
-            </div>
-
-            <div className="mb-4">
-              <label htmlFor="title" className="block text-gray-700 font-medium mb-2">
-                Title*
-              </label>
-              <input
-                type="text"
-                id="title"
-                name="title"
-                value={newTestimonial.title}
-                onChange={handleInputChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Enter a title for your review"
-                required
-              />
-            </div>
-
-            <div className="mb-4">
-              <label htmlFor="description" className="block text-gray-700 font-medium mb-2">
-                Your Review*
-              </label>
-              <textarea
-                id="description"
-                name="description"
-                value={newTestimonial.description}
-                onChange={handleInputChange}
-                rows="4"
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Share your experience with our marketplace"
-                required
-              ></textarea>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-gray-700 font-medium mb-2">Rating</label>
-              <div className="flex">
-                {[...Array(5)].map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleRatingChange(i + 1)}
-                    className="focus:outline-none"
-                  >
-                    <FaStar
-                      className={i < newTestimonial.rating ? "text-yellow-400" : "text-gray-300"}
-                      size={24}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end">
+      {/* Review Form Section */}
+      <div className="mt-16 max-w-4xl mx-auto">
+        {user ? (
+          <>
+            <div className="flex justify-center mb-8">
               <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="mr-4 px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                onClick={() => setShowForm(!showForm)}
+                className={`px-6 py-3 rounded-md flex items-center ${
+                  showForm
+                    ? "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                    : "bg-blue-800 text-white hover:bg-blue-700"
+                } transition-colors`}
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="bg-blue-800 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:bg-blue-400"
-              >
-                {submitting ? (
+                {showForm ? (
                   <>
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Submitting...
+                    <FaChevronLeft className="mr-2" />
+                    Cancel
                   </>
                 ) : (
-                  "Submit Review"
+                  "Write a Review"
                 )}
               </button>
             </div>
-          </form>
-        </div>
-      )}
+
+            {showForm && (
+              <div className="bg-white p-6 md:p-8 rounded-lg shadow-md border border-gray-200">
+                <h3 className="text-xl font-bold mb-2">Share Your Experience</h3>
+                <p className="text-gray-600 mb-6">Your review will help others make better decisions</p>
+                
+                <form onSubmit={addTestimonial}>
+                  <div className="mb-6">
+                    <label className="block text-gray-700 font-medium mb-3">Your Rating</label>
+                    <div className="flex space-x-2">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => handleRatingChange(star)}
+                          className="focus:outline-none"
+                        >
+                          <FaStar
+                            className={`text-2xl ${
+                              star <= newTestimonial.rating 
+                                ? "text-yellow-400" 
+                                : "text-gray-300"
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mb-6">
+                    <label htmlFor="title" className="block text-gray-700 font-medium mb-2">
+                      Review Title
+                    </label>
+                    <input
+                      type="text"
+                      id="title"
+                      name="title"
+                      value={newTestimonial.title}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Summarize your experience"
+                      required
+                    />
+                  </div>
+
+                  <div className="mb-6">
+                    <label htmlFor="description" className="block text-gray-700 font-medium mb-2">
+                      Detailed Review
+                    </label>
+                    <textarea
+                      id="description"
+                      name="description"
+                      value={newTestimonial.description}
+                      onChange={handleInputChange}
+                      rows="5"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="What did you like or dislike?"
+                      required
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowForm(false)}
+                      className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={submitting}
+                      className="px-6 py-2 bg-blue-800 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-70"
+                    >
+                      {submitting ? "Submitting..." : "Submit Review"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-center p-6 bg-blue-50 rounded-lg">
+            <h3 className="text-lg font-medium text-blue-800 mb-2">
+              Want to share your experience?
+            </h3>
+            <p className="text-blue-700">
+              Please sign in to leave a review and help others in our community
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -20,9 +20,9 @@ function Dashboard() {
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
-  const [image, setImage] = useState('');
- 
-
+  const [shippingCost, setShippingCost] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -117,13 +117,47 @@ function Dashboard() {
     if (user) fetchProducts();
   }, [user]);
 
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const uploadImage = async () => {
+    if (!imageFile) return null;
+    
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('store-images')
+        .upload(fileName, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('store-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       if (!user) throw new Error('Authentication required');
-      if (!name || !description || !category || !price || !quantity || !image) {
+      if (!name || !description || !category || !price || !quantity || !shippingCost || !imageFile) {
         throw new Error('Please fill all required fields');
       }
+
+      const imageUrl = await uploadImage();
 
       const { data: seller } = await supabase
         .from('sellers')
@@ -135,7 +169,16 @@ function Dashboard() {
 
       const { error } = await supabase
         .from('products')
-        .insert([{ name, description, category, price: parseFloat(price), quantity: parseInt(quantity), image, store_id: seller.store_id }]);
+        .insert([{ 
+          name, 
+          description, 
+          category, 
+          price: parseFloat(price), 
+          quantity: parseInt(quantity), 
+          shipping_cost: parseFloat(shippingCost),
+          image: imageUrl, 
+          store_id: seller.store_id 
+        }]);
 
       if (error) throw error;
 
@@ -147,7 +190,10 @@ function Dashboard() {
       });
       resetForm();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message, {
+        position: "top-center",
+        autoClose: 2000,
+      });
       console.error(err);
     }
   };
@@ -183,7 +229,9 @@ function Dashboard() {
     setCategory('');
     setPrice('');
     setQuantity('');
-    setImage('');
+    setShippingCost('');
+    setImageFile(null);
+    setImagePreview('');
   };
 
   if (loading) return <div className="p-4">Loading products...</div>;
@@ -294,16 +342,46 @@ function Dashboard() {
                     />
                   </div>
 
-                  {/* Image */}
+                  {/* Shipping Cost */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Cost (RM)</label>
                     <input
-                      type="text"
-                      value={image}
-                      onChange={(e) => setImage(e.target.value)}
+                      type="number"
+                      value={shippingCost}
+                      onChange={(e) => setShippingCost(e.target.value)}
+                      min="0"
+                      step="0.01"
                       className="w-full p-2 border border-gray-300 rounded-md"
                       required
                     />
+                  </div>
+
+                  {/* Image Upload */}
+                  <div className="col-span-1 sm:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Product Image</label>
+                    <div className="flex items-center">
+                      <label className="flex flex-col items-center justify-center w-full p-2 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                        {imagePreview ? (
+                          <img src={imagePreview} alt="Preview" className="h-20 w-20 object-cover mb-2 rounded" />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                            <svg className="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                            </svg>
+                            <p className="mb-2 text-sm text-gray-500"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                            <p className="text-xs text-gray-500">PNG, JPG, JPEG (MAX. 5MB)</p>
+                          </div>
+                        )}
+                        <input 
+                          id="dropzone-file" 
+                          type="file" 
+                          className="hidden" 
+                          onChange={handleImageChange}
+                          accept="image/*"
+                          required
+                        />
+                      </label>
+                    </div>
                   </div>
 
                   <div className="col-span-1 sm:col-span-2 lg:col-span-3 flex justify-end">
@@ -325,6 +403,7 @@ function Dashboard() {
                       <th className="px-4 py-2 text-left font-medium text-gray-600">Product</th>
                       <th className="px-4 py-2 text-left font-medium text-gray-600">Category</th>
                       <th className="px-4 py-2 text-left font-medium text-gray-600">Price</th>
+                      <th className="px-4 py-2 text-left font-medium text-gray-600">Shipping Cost</th>
                       <th className="px-4 py-2 text-left font-medium text-gray-600">Quantity</th>
                       <th className="px-4 py-2 text-left font-medium text-gray-600">Actions</th>
                     </tr>
@@ -332,7 +411,7 @@ function Dashboard() {
                   <tbody className="divide-y divide-gray-200">
                     {products.length === 0 ? (
                       <tr>
-                        <td colSpan="5" className="px-4 py-6 text-center text-gray-500">
+                        <td colSpan="6" className="px-4 py-6 text-center text-gray-500">
                           No products found. Start by adding your first product.
                         </td>
                       </tr>
@@ -348,6 +427,7 @@ function Dashboard() {
                         </td>
                         <td className="px-4 py-2">{product.category}</td>
                         <td className="px-4 py-2">RM {product.price}</td>
+                        <td className="px-4 py-2">RM {product.shipping_cost || '0.00'}</td>
                         <td className="px-4 py-2">{product.quantity}</td>
                         <td className="px-4 py-2 flex space-x-2">
                           <button
@@ -358,7 +438,8 @@ function Dashboard() {
                               setCategory(product.category);
                               setPrice(product.price);
                               setQuantity(product.quantity);
-                              setImage(product.image);
+                              setShippingCost(product.shipping_cost || '');
+                              setImagePreview(product.image);
                             }}
                           >
                             <FaEdit />
@@ -378,109 +459,109 @@ function Dashboard() {
             </>
           )}
           
-                    {active === "orders" ? (
-              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="px-4 md:px-6 py-4 border-b border-gray-200">
-                  <h2 className="text-lg font-medium">Recent Orders</h2>
-                </div>
-                {ordersLoading ? (
-                  <div className="p-4">Loading orders...</div>
-                ) : ordersError ? (
-                  <div className="p-4 text-red-500">{ordersError}</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      {/* Table headers remain the same */}
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {orders.length === 0 ? (
-                          <tr>
-                            <td colSpan="7" className="px-4 md:px-6 py-6 text-center text-gray-500">
-                              No orders found
+          {active === "orders" ? (
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="px-4 md:px-6 py-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium">Recent Orders</h2>
+              </div>
+              {ordersLoading ? (
+                <div className="p-4">Loading orders...</div>
+              ) : ordersError ? (
+                <div className="p-4 text-red-500">{ordersError}</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    {/* Table headers remain the same */}
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {orders.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="px-4 md:px-6 py-6 text-center text-gray-500">
+                            No orders found
+                          </td>
+                        </tr>
+                      ) : (
+                        orders.map((order) => (
+                          <tr key={order.id} className="hover:bg-gray-50">
+                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                #{order.id.slice(0, 8)}
+                              </div>
+                            </td>
+                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {order.shipping_info?.first_name} {order.shipping_info?.last_name}
+                              </div>
+                            </td>
+                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {new Date(order.created_at).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                RM {order.total_price.toFixed(2)}
+                              </div>
+                            </td>
+                            <td className="px-4 md:px-6 py-4">
+                              <div className="text-sm text-gray-900">
+                                {order.shipping_info?.address}
+                                {order.shipping_info?.exact_place && `, ${order.shipping_info.exact_place}`}
+                              </div>
+                            </td>
+                            <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                                ${getStatusClass(order.status)}`}>
+                                {order.status === 'on_the_way' && <FaTruck className="mr-1" />}
+                                {order.status}
+                              </span>
+                            </td>
+                            <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              {order.status === 'pending' && (
+                                <div className="flex justify-end space-x-2">
+                                  <button
+                                    className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs md:text-sm"
+                                    onClick={() => handleOrderAction(order.id, 'accepted')}
+                                  >
+                                    Accept
+                                  </button>
+                                  <button
+                                    className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-xs md:text-sm"
+                                    onClick={() => handleOrderAction(order.id, 'declined')}
+                                  >
+                                    Decline
+                                  </button>
+                                </div>
+                              )}
+                              {order.status === 'accepted' && (
+                                <button
+                                  className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
+                                  onClick={() => handleOrderAction(order.id, 'on_the_way')}
+                                >
+                                  Mark On The Way
+                                </button>
+                              )}
+                              {order.status === 'on_the_way' && (
+                                <button
+                                  className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
+                                  onClick={() => handleOrderAction(order.id, 'delivered')}
+                                >
+                                  Mark Delivered
+                                </button>
+                              )}
                             </td>
                           </tr>
-                        ) : (
-                          orders.map((order) => (
-                            <tr key={order.id} className="hover:bg-gray-50">
-                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm font-medium text-gray-900">
-                                  #{order.id.slice(0, 8)}
-                                </div>
-                              </td>
-                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  {order.shipping_info?.first_name} {order.shipping_info?.last_name}
-                                </div>
-                              </td>
-                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  {new Date(order.created_at).toLocaleDateString()}
-                                </div>
-                              </td>
-                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  RM {order.total_price.toFixed(2)}
-                                </div>
-                              </td>
-                              <td className="px-4 md:px-6 py-4">
-                                <div className="text-sm text-gray-900">
-                                  {order.shipping_info?.address}
-                                  {order.shipping_info?.exact_place && `, ${order.shipping_info.exact_place}`}
-                                </div>
-                              </td>
-                              <td className="px-4 md:px-6 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                                  ${getStatusClass(order.status)}`}>
-                                  {order.status === 'on_the_way' && <FaTruck className="mr-1" />}
-                                  {order.status}
-                                </span>
-                              </td>
-                              <td className="px-4 md:px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                {order.status === 'pending' && (
-                                  <div className="flex justify-end space-x-2">
-                                    <button
-                                      className="bg-green-600 text-white px-2 py-1 rounded-md hover:bg-green-700 text-xs md:text-sm"
-                                      onClick={() => handleOrderAction(order.id, 'accepted')}
-                                    >
-                                      Accept
-                                    </button>
-                                    <button
-                                      className="bg-red-600 text-white px-2 py-1 rounded-md hover:bg-red-700 text-xs md:text-sm"
-                                      onClick={() => handleOrderAction(order.id, 'declined')}
-                                    >
-                                      Decline
-                                    </button>
-                                  </div>
-                                )}
-                                {order.status === 'accepted' && (
-                                  <button
-                                    className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
-                                    onClick={() => handleOrderAction(order.id, 'on_the_way')}
-                                  >
-                                    Mark On The Way
-                                  </button>
-                                )}
-                                {order.status === 'on_the_way' && (
-                                  <button
-                                    className="bg-blue-600 text-white px-2 py-1 rounded-md hover:bg-blue-700 text-xs md:text-sm"
-                                    onClick={() => handleOrderAction(order.id, 'delivered')}
-                                  >
-                                    Mark Delivered
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="p-4 text-gray-500">
-                <p>Select "Manage Products" to add or edit your products.</p>
-              </div>
-            )}
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 text-gray-500">
+              <p>Select "Manage Products" to add or edit your products.</p>
+            </div>
+          )}
         </main>
       </div>
     </div>

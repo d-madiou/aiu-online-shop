@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { FaBox, FaCheck, FaClock, FaFileInvoice, FaShippingFast, FaTimes, FaTrash, FaTruck } from "react-icons/fa"
+import { Helmet } from "react-helmet"
+import { FaArrowLeft, FaBox, FaCheck, FaClock, FaTimes, FaTrash, FaTruck, FaShoppingBag } from "react-icons/fa"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../supabase-client"
 import { toast } from "react-toastify"
@@ -20,7 +21,6 @@ const Order = () => {
       try {
         setLoading(true)
 
-        
         const { data, error } = await supabase
           .from("orders")
           .select(`
@@ -32,7 +32,6 @@ const Order = () => {
 
         if (error) throw error
 
-   
         const { data: orderItems, error: itemsError } = await supabase
           .from("order_items")
           .select(`
@@ -43,27 +42,25 @@ const Order = () => {
 
         if (itemsError) throw itemsError
 
-       
         setOrder({
           ...data,
           products: orderItems.map((item) => ({
             ...item.product,
             quantity: item.quantity,
           })),
-          
           status: data.status || "pending",
         })
       } catch (err) {
         console.error("Error fetching order:", err)
         setError(err.message)
 
-        
+        // Mock data for demo
         setOrder({
           id: id || "ORD-" + Math.floor(10000 + Math.random() * 90000),
           created_at: new Date().toISOString(),
           total_price: 249.98,
           payment_method: "Cash On Delivery",
-          status: "pending", 
+          status: "pending",
           shipping_info: {
             first_name: "John",
             last_name: "Doe",
@@ -95,477 +92,408 @@ const Order = () => {
     }
 
     fetchOrder()
-  }, [id])
+
+    // Set up real-time subscription for order updates
+    const orderSubscription = supabase
+      .channel(`order-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          console.log('Order updated:', payload)
+          setOrder(prevOrder => {
+            if (prevOrder) {
+              return {
+                ...prevOrder,
+                ...payload.new,
+                status: payload.new.status || prevOrder.status
+              }
+            }
+            return prevOrder
+          })
+          
+          // Show toast notification for status changes
+          if (payload.new.status !== payload.old.status) {
+            const statusInfo = getStatusInfo(payload.new.status)
+            toast.info(`Order status updated: ${statusInfo.text}`, {
+              position: "top-center",
+              autoClose: 5000,
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    // Set up real-time subscription for order deletion
+    const orderDeletionSubscription = supabase
+      .channel(`order-deletion-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${id}`
+        },
+        (payload) => {
+          console.log('Order deleted:', payload)
+          toast.info('Order has been removed', {
+            position: "top-center",
+            autoClose: 3000,
+          })
+          navigate("/shop", { replace: true, state: { orderDeleted: true } })
+        }
+      )
+      .subscribe()
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      supabase.removeChannel(orderSubscription)
+      supabase.removeChannel(orderDeletionSubscription)
+    }
+  }, [id, navigate])
 
   const handleClearOrder = async () => {
-    if (!window.confirm("Are you sure you want to permanently delete this order? This action cannot be undone.")) {
+    const orderStatus = order.status.toLowerCase()
+    const isCompletedOrder = ["delivered", "declined"].includes(orderStatus)
+    
+    if (!isCompletedOrder) {
+      toast.error("You can only clear completed orders (delivered or declined).", {
+        position: "top-center",
+        autoClose: 5000,
+      })
+      return
+    }
+
+    const confirmMessage = orderStatus === "delivered" 
+      ? "Are you sure you want to clear this delivered order? This will remove it from your order history."
+      : "Are you sure you want to permanently delete this declined order? This action cannot be undone."
+
+    if (!window.confirm(confirmMessage)) {
       return
     }
 
     try {
       setIsDeleting(true)
 
-      
+      // Delete order items first (foreign key constraint)
       const { error: itemsError } = await supabase
-        .from('order_items')
+        .from("order_items")
         .delete()
-        .eq('order_id', id)
-
+        .eq("order_id", id)
+      
       if (itemsError) throw itemsError
 
-      const { error: shippingError } = await supabase
-        .from('shipping_info')
-        .delete()
-        .eq('id', order.shipping_info_id)
+      // Delete shipping info if it exists and is linked to this order
+      if (order.shipping_info_id) {
+        const { error: shippingError } = await supabase
+          .from("shipping_info")
+          .delete()
+          .eq("id", order.shipping_info_id)
+        
+        if (shippingError) {
+          console.warn("Error deleting shipping info:", shippingError)
+          // Don't throw here as it's not critical
+        }
+      }
 
-      if (shippingError) throw shippingError
-
+      // Finally delete the order
       const { error: orderError } = await supabase
-        .from('orders')
+        .from("orders")
         .delete()
-        .eq('id', id)
-
+        .eq("id", id)
+      
       if (orderError) throw orderError
 
-      
-      setOrder(null)
-      navigate('/shop', { replace: true, state: { orderDeleted: true } })
+      toast.success(
+        orderStatus === "delivered" 
+          ? "Order cleared successfully!" 
+          : "Order deleted successfully!", 
+        {
+          position: "top-center",
+          autoClose: 3000,
+        }
+      )
 
+      // Navigate away immediately
+      navigate("/shop", { replace: true, state: { orderDeleted: true } })
+      
     } catch (err) {
-      console.error("Error deleting order:", err)
-      toast.error("Failed to delete order. Please try again.", {
+      console.error("Error clearing order:", err)
+      toast.error("Failed to clear order. Please try again.", {
         position: "top-center",
         autoClose: 5000,
       })
-
     } finally {
       setIsDeleting(false)
     }
   }
 
+  const getStatusInfo = (status) => {
+    switch (status.toLowerCase()) {
+      case "pending":
+        return { color: "bg-yellow-100 text-yellow-800", icon: <FaClock />, text: "Pending Confirmation" }
+      case "accepted":
+        return { color: "bg-green-100 text-green-800", icon: <FaCheck />, text: "Order Accepted" }
+      case "on the way":
+        return { color: "bg-blue-100 text-blue-800", icon: <FaTruck />, text: "On The Way" }
+      case "delivered":
+        return { color: "bg-green-100 text-green-800", icon: <FaBox />, text: "Delivered" }
+      case "declined":
+        return { color: "bg-red-100 text-red-800", icon: <FaTimes />, text: "Order Declined" }
+      default:
+        return { color: "bg-gray-100 text-gray-800", icon: <FaBox />, text: status }
+    }
+  }
+
+  const canClearOrder = () => {
+    const status = order?.status.toLowerCase()
+    return ["delivered", "declined"].includes(status)
+  }
+
   if (loading) {
     return (
-      <div className="container mx-auto py-12 px-4">
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-800"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your order...</p>
         </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error || !order) {
     return (
-      <div className="container mx-auto py-12 px-4">
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
-          <h3 className="text-lg font-medium mb-2">Error Loading Order</h3>
-          <p>{error}</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
+          <div className="text-red-500 text-5xl mb-4">
+            <FaTimes />
+          </div>
+          <h3 className="text-xl font-bold text-gray-800 mb-2">Order Not Found</h3>
+          <p className="text-gray-600 mb-6">The order you're looking for doesn't exist or has been removed.</p>
           <button
             onClick={() => navigate(-1)}
-            className="mt-4 text-red-700 hover:text-red-800 font-medium flex items-center"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center mx-auto"
           >
-            Go Back
+            <FaArrowLeft className="mr-2" /> Go Back
           </button>
         </div>
       </div>
     )
   }
 
-  if (!order) {
-    return (
-      <div className="container mx-auto py-12 px-4">
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 p-4 rounded-lg">
-          <h3 className="text-lg font-medium mb-2">Order Not Found</h3>
-          <p>The order you're looking for doesn't exist or has been removed.</p>
-          <button
-            onClick={() => navigate(-1)}
-            className="mt-4 text-blue-700 hover:text-blue-800 font-medium flex items-center"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    )
-  }
-
+  const statusInfo = getStatusInfo(order.status)
   const orderDate = new Date(order.created_at).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   })
 
-  const getStatusColor = (status) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800"
-      case "accepted":
-      case "on the way":
-        return "bg-green-100 text-green-800"
-      case "delivered":
-        return "bg-blue-100 text-blue-800"
-      case "declined":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  const getStatusIcon = (status) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return <FaClock />
-      case "accepted":
-        return <FaCheck />
-      case "on the way":
-        return <FaTruck />
-      case "delivered":
-        return <FaBox />
-      case "declined":
-        return <FaTimes />
-      default:
-        return <FaBox />
-    }
-  }
-
-  const getStatusText = (status) => {
-    switch (status.toLowerCase()) {
-      case "pending":
-        return "Pending Confirmation"
-      case "accepted":
-        return "Order Accepted"
-      case "on the way":
-        return "On The Way"
-      case "delivered":
-        return "Delivered"
-      case "declined":
-        return "Order Declined"
-      default:
-        return status
-    }
-  }
-
-  const showDeliveryTracking = ["accepted", "on the way", "delivered"].includes(order.status.toLowerCase())
-
-  const showClearButton = order.status.toLowerCase() === "declined"
-
   return (
-    <div className="container mx-auto py-12 px-4">
-      <div className="mb-6 flex justify-between items-center">
-        <button onClick={() => navigate(-1)} className="text-blue-800 hover:underline flex items-center">
-          &larr; Back
-        </button>
-        <button className="">Clear all</button>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* SEO */}
+      <Helmet>
+        <title>Order #{order.id} | AIU Marketplace</title>
+        <meta name="description" content={`View details for order #${order.id} at AIU Marketplace`} />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
 
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        
-        
-        <div className="bg-blue-800 text-white p-6">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center">
-            <div>
-              <h1 className="text-2xl font-bold mb-1">Order #{order.id}</h1>
-              <p className="text-blue-100">Placed on {orderDate}</p>
-            </div>
-            <div className="mt-4 md:mt-0">
-              <div
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}
-              >
-                {getStatusIcon(order.status)}
-                <span className="ml-2">{getStatusText(order.status)}</span>
+      <div className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center text-gray-600 hover:text-blue-600 transition-colors"
+          >
+            <FaArrowLeft className="mr-2" /> Back
+          </button>
+          {canClearOrder() && (
+            <button
+              onClick={handleClearOrder}
+              disabled={isDeleting}
+              className={`flex items-center px-4 py-2 border rounded-lg transition-colors disabled:opacity-50 ${
+                order.status.toLowerCase() === "delivered"
+                  ? "text-blue-600 border-blue-600 hover:bg-blue-50"
+                  : "text-red-600 border-red-600 hover:bg-red-50"
+              }`}
+            >
+              {isDeleting ? (
+                <>
+                  <div className={`animate-spin rounded-full h-4 w-4 border-t-2 mr-2 ${
+                    order.status.toLowerCase() === "delivered" ? "border-blue-600" : "border-red-600"
+                  }`}></div>
+                  {order.status.toLowerCase() === "delivered" ? "Clearing..." : "Deleting..."}
+                </>
+              ) : (
+                <>
+                  <FaTrash className="mr-2" /> 
+                  {order.status.toLowerCase() === "delivered" ? "Clear Order" : "Delete Order"}
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Order Card */}
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+          {/* Header */}
+          <div className="bg-blue-600 text-white p-6">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold mb-1">Order #{order.id}</h1>
+                <p className="text-blue-100">Placed on {orderDate}</p>
+              </div>
+              <div className="mt-4 md:mt-0">
+                <div
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}
+                >
+                  {statusInfo.icon}
+                  <span className="ml-2">{statusInfo.text}</span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Order Content */}
-        <div className="p-6">
-          {/* Delivery Tracking - Only show for accepted/on the way orders */}
-          {showDeliveryTracking && (
-            <div className="mb-8 bg-blue-50 p-4 rounded-lg border border-blue-100">
-              <h2 className="text-lg font-bold mb-4 flex items-center">
-                <FaTruck className="mr-2 text-blue-800" /> Delivery Status
-              </h2>
-
+          {/* Progress Bar for Active Orders */}
+          {["accepted", "on the way", "delivered"].includes(order.status.toLowerCase()) && (
+            <div className="p-6 bg-blue-50 border-b">
+              <h3 className="text-lg font-semibold mb-4 text-gray-800">Order Progress</h3>
               <div className="relative">
-                {/* Progress bar */}
-                <div className="h-1 bg-gray-200 absolute top-5 left-0 right-0 z-0">
+                <div className="flex justify-between items-center">
+                  {[
+                    { label: "Confirmed", icon: <FaCheck />, status: ["accepted", "on the way", "delivered"] },
+                    { label: "On The Way", icon: <FaTruck />, status: ["on the way", "delivered"] },
+                    { label: "Delivered", icon: <FaBox />, status: ["delivered"] },
+                  ].map((step, index) => {
+                    const isActive = step.status.includes(order.status.toLowerCase())
+                    return (
+                      <div key={step.label} className="flex flex-col items-center">
+                        <div
+                          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                            isActive ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-500"
+                          }`}
+                        >
+                          {step.icon}
+                        </div>
+                        <p className="mt-2 text-sm font-medium text-gray-700">{step.label}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="absolute top-5 left-5 right-5 h-1 bg-gray-200 -z-10">
                   <div
-                    className="h-1 bg-blue-800 absolute top-0 left-0 z-10"
+                    className="h-full bg-blue-600 transition-all duration-500"
                     style={{
                       width:
                         order.status === "accepted"
-                          ? "25%"
+                          ? "0%"
                           : order.status === "on the way"
-                            ? "75%"
+                            ? "50%"
                             : order.status === "delivered"
                               ? "100%"
                               : "0%",
                     }}
                   ></div>
                 </div>
-
-                {/* Steps */}
-                <div className="flex justify-between relative z-20">
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        ["accepted", "on the way", "delivered"].includes(order.status)
-                          ? "bg-blue-800 text-white"
-                          : "bg-gray-200 text-gray-500"
-                      }`}
-                    >
-                      <FaCheck />
-                    </div>
-                    <p className="mt-2 text-sm text-center">Confirmed</p>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        ["on the way", "delivered"].includes(order.status)
-                          ? "bg-blue-800 text-white"
-                          : "bg-gray-200 text-gray-500"
-                      }`}
-                    >
-                      <FaTruck />
-                    </div>
-                    <p className="mt-2 text-sm text-center">On The Way</p>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        order.status === "delivered" ? "bg-blue-800 text-white" : "bg-gray-200 text-gray-500"
-                      }`}
-                    >
-                      <FaBox />
-                    </div>
-                    <p className="mt-2 text-sm text-center">Delivered</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 text-center">
-                <p className="text-blue-800 font-medium">
-                  {order.status === "accepted" && "Your order has been confirmed and is being prepared for shipping."}
-                  {order.status === "on the way" && "Your order is on the way to your location."}
-                  {order.status === "delivered" && "Your order has been delivered. Enjoy!"}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  Estimated delivery: {new Date(new Date().setDate(new Date().getDate() + 3)).toLocaleDateString()}
-                </p>
               </div>
             </div>
           )}
 
-          {/* Clear Order Button - Only show for declined orders */}
-          {showClearButton && (
-            <div className="mb-8 bg-red-50 p-4 rounded-lg border border-red-100">
-              <div className="flex flex-col md:flex-row items-center justify-between">
-                <div>
-                  <h3 className="font-bold text-red-800 mb-1">Order Declined</h3>
-                  <p className="text-gray-700 text-sm">
-                    We're sorry, but your order has been declined by the seller. This could be due to stock
-                    unavailability or other issues.
-                  </p>
-                </div>
-                <button
-          onClick={handleClearOrder}
-          disabled={isDeleting}
-          className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center disabled:opacity-50"
-        >
-          {isDeleting ? (
-            <>
-              <svg
-                className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Deleting...
-            </>
-          ) : (
-            <>
-              <FaTrash className="mr-2" /> Clear Order
-            </>
-          )}
-        </button>
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Order Summary */}
-            <div className="md:col-span-2">
-              <div className="mb-8">
-                <h2 className="text-lg font-bold mb-4 flex items-center">
-                  <FaFileInvoice className="mr-2 text-blue-800" /> Order Summary
-                </h2>
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Product
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Price
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Total
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {order.products.map((product) => (
-                        <tr key={product.id}>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10">
-                                <img
-                                  className="h-10 w-10 rounded-md object-cover"
-                                  src={product.image || "/placeholder.svg"}
-                                  alt={product.name}
-                                />
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">RM {product.price.toFixed(2)}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">{product.quantity}</div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm font-medium text-gray-900">
-                              RM {(product.price * product.quantity).toFixed(2)}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Shipping Information */}
-              <div>
-                <h2 className="text-lg font-bold mb-4 flex items-center">
-                  <FaShippingFast className="mr-2 text-blue-800" /> Shipping Information
-                </h2>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Recipient</p>
-                      <p className="font-medium">
-                        {order.shipping_info.first_name} {order.shipping_info.last_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500 mb-1">Phone</p>
-                      <p className="font-medium">{order.shipping_info.phone}</p>
-                    </div>
-                    <div className="md:col-span-2">
-                      <p className="text-sm text-gray-500 mb-1">Address</p>
-                      <p className="font-medium">{order.shipping_info.address}</p>
-                      {order.shipping_info.exact_place && (
-                        <p className="text-sm text-gray-700">{order.shipping_info.exact_place}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Order Details */}
-            <div>
-              <h2 className="text-lg font-bold mb-4">Order Details</h2>
-              <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+          <div className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Order Items */}
+              <div className="lg:col-span-2">
+                <h2 className="text-xl font-bold mb-4 text-gray-800">Order Items</h2>
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Order Number</p>
-                    <p className="font-medium">{order.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Date Placed</p>
-                    <p className="font-medium">{orderDate}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Payment Method</p>
-                    <p className="font-medium">{order.payment_method}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500 mb-1">Status</p>
-                    <div
-                      className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}
-                    >
-                      {getStatusIcon(order.status)}
-                      <span className="ml-2">{getStatusText(order.status)}</span>
+                  {order.products.map((product) => (
+                    <div key={product.id} className="flex items-center p-4 border border-gray-200 rounded-lg">
+                      <img
+                        src={product.image || "/placeholder.svg"}
+                        alt={product.name}
+                        className="w-16 h-16 object-cover rounded-lg"
+                      />
+                      <div className="ml-4 flex-1">
+                        <h3 className="font-semibold text-gray-800">{product.name}</h3>
+                        <p className="text-gray-600">Qty: {product.quantity}</p>
+                        <p className="text-blue-600 font-bold">RM {(product.price * product.quantity).toFixed(2)}</p>
+                      </div>
                     </div>
-                  </div>
+                  ))}
+                </div>
 
-                  <div className="pt-4 border-t border-gray-200">
-                    <div className="flex justify-between mb-2">
-                      <p className="text-gray-600">Subtotal</p>
-                      <p className="font-medium">RM {order.total_price.toFixed(2)}</p>
-                    </div>
-                    <div className="flex justify-between mb-2">
-                      <p className="text-gray-600">Shipping</p>
-                      <p className="font-medium">Free</p>
-                    </div>
-                    <div className="flex justify-between pt-2 border-t border-gray-200">
-                      <p className="font-bold">Total</p>
-                      <p className="font-bold text-blue-800">RM {order.total_price.toFixed(2)}</p>
+                {/* Shipping Info */}
+                <div className="mt-8">
+                  <h2 className="text-xl font-bold mb-4 text-gray-800">Shipping Information</h2>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-gray-600 text-sm">Recipient</p>
+                        <p className="font-semibold">
+                          {order.shipping_info.first_name} {order.shipping_info.last_name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-600 text-sm">Phone</p>
+                        <p className="font-semibold">{order.shipping_info.phone}</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <p className="text-gray-600 text-sm">Address</p>
+                        <p className="font-semibold">{order.shipping_info.address}</p>
+                        {order.shipping_info.exact_place && (
+                          <p className="text-gray-600">{order.shipping_info.exact_place}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="mt-6 space-y-3">
-                <button
-                  onClick={() => navigate("/")}
-                  className="w-full bg-blue-800 text-white py-2 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Continue Shopping
-                </button>
-                <button
-                  onClick={() => navigate("/contact")}
-                  className="w-full border border-blue-800 text-blue-800 py-2 rounded-md hover:bg-blue-50 transition-colors"
-                >
-                  Contact Support
-                </button>
+              {/* Order Summary */}
+              <div>
+                <h2 className="text-xl font-bold mb-4 text-gray-800">Order Summary</h2>
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Subtotal</span>
+                      <span className="font-semibold">RM {order.total_price.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Shipping</span>
+                      <span className="font-semibold text-green-600">Free</span>
+                    </div>
+                    <div className="border-t pt-3">
+                      <div className="flex justify-between">
+                        <span className="text-lg font-bold">Total</span>
+                        <span className="text-lg font-bold text-blue-600">RM {order.total_price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 p-3 bg-white rounded border">
+                      <p className="text-sm text-gray-600">Payment Method</p>
+                      <p className="font-semibold">{order.payment_method}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="mt-6 space-y-3">
+                  <button
+                    onClick={() => navigate("/")}
+                    className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
+                  >
+                    <FaShoppingBag className="mr-2" /> Continue Shopping
+                  </button>
+                  <button
+                    onClick={() => navigate("/contact")}
+                    className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg hover:bg-blue-50 transition-colors"
+                  >
+                    Contact Support
+                  </button>
+                </div>
               </div>
             </div>
           </div>

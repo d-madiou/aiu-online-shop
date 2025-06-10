@@ -26,7 +26,7 @@ const ProductCard = ({ product, store }) => {
       if (!user) {
         toast.error("Please log in to add to cart.", {
           position: "top-center",
-          autoClose: 5000,
+          autoClose: 2000,
         })
         setIsAddingToCart(false)
         return
@@ -59,7 +59,7 @@ const ProductCard = ({ product, store }) => {
 
       toast.success("Added to cart!", {
         position: "top-right",
-        autoClose: 3000,
+        autoClose: 1000,
       })
     } catch (error) {
       console.error("Error adding to cart:", error)

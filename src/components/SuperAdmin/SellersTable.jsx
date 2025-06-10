@@ -19,6 +19,7 @@ export const SellersTable = ({ sellers, stores, onDeleteSeller }) => (
             <tr key={seller.id}>
               <td className="px-4 py-3">{seller.name}</td>
               <td className="px-4 py-3">{seller.email}</td>
+              <td className="px-4 py-3">{seller.type}</td>
               <td className="px-4 py-3">
                 {stores.find(s => s.id === seller.store_id)?.name || 'N/A'}
               </td>

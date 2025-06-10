@@ -12,6 +12,7 @@ import Shop from "./pages/Shop";
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import SuperAdmin from "./pages/SuperAdmin";
+import About from "./pages/About";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -30,6 +31,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/shop" element={<Shop />} />
+        <Route path="/about" element={<About />} />
+
         <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/superadmin" element={<SuperAdmin />} />
         <Route path="/admin" element={<Dashboard />} />

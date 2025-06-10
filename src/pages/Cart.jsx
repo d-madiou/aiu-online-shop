@@ -15,6 +15,7 @@ const Cart = () => {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
   const [order, setOrder] = useState(null)
+  const [shippingCost, setShippingCost] = useState(0)
   const navigate = useNavigate()
 
   // Fetch cart items from Supabase
@@ -23,9 +24,24 @@ const Cart = () => {
     if (!user?.data?.user?.id) return
 
     const { data, error } = await supabase.from("cart").select("*").eq("user_id", user.data.user.id)
-
     if (!error) setCartItems(data)
   }
+
+  // Fetch shipping cost from products
+  const fetchShippingCost = async () => {
+    const { data, error } = await supabase.from("products").select("shipping_cost").single()
+    if (!error) return data.shipping_cost || 0
+    return 0
+  }
+
+  useEffect(() => {
+    const fetchShipping = async () => {
+      const cost = await fetchShippingCost()
+      setShippingCost(cost)
+      setAddress(prev => `${prev} (Shipping Cost: RM ${cost.toFixed(2)})`)
+    }
+    fetchShipping()
+  }, [])
 
   useEffect(() => {
     fetchCart()
@@ -56,6 +72,7 @@ const Cart = () => {
 
   const totalPrice = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const finalTotal = totalPrice + shippingCost
 
   return (
     <div className="container mx-auto py-8 min-h-screen px-4 md:px-8 lg:px-16">
@@ -82,7 +99,6 @@ const Cart = () => {
                 <div className="divide-y divide-gray-100">
                   {cartItems.map((product) => (
                     <div key={product.id} className="p-4 flex flex-col md:flex-row md:items-center">
-                      {/* Product Info - Mobile & Desktop */}
                       <div className="flex items-center md:w-2/5 mb-4 md:mb-0">
                         <div className="w-20 h-20 bg-gray-100 rounded-md overflow-hidden flex-shrink-0">
                           <img
@@ -94,19 +110,15 @@ const Cart = () => {
                         <div className="ml-4">
                           <h3 className="font-medium text-gray-900">{product.name}</h3>
                           <p className="text-sm text-gray-500 mt-1">{product.category}</p>
-                          {/* Mobile only price */}
                           <p className="text-blue-800 font-medium mt-1 md:hidden">RM {product.price.toFixed(2)}</p>
                         </div>
                       </div>
 
-                      {/* Price, Quantity, Subtotal - Desktop */}
                       <div className="md:w-3/5 flex flex-col md:flex-row md:items-center">
-                        {/* Price - Desktop only */}
                         <div className="hidden md:block md:w-1/4 text-center">
                           <p className="text-gray-900 font-medium">RM {product.price.toFixed(2)}</p>
                         </div>
 
-                        {/* Quantity Controls */}
                         <div className="flex items-center justify-between md:justify-center md:w-1/4">
                           <span className="text-sm text-gray-500 mr-2 md:hidden">Quantity:</span>
                           <div className="flex items-center border border-gray-200 rounded-md">
@@ -128,7 +140,6 @@ const Cart = () => {
                           </div>
                         </div>
 
-                        {/* Subtotal */}
                         <div className="flex items-center justify-between mt-3 md:mt-0 md:justify-center md:w-1/4">
                           <span className="text-sm text-gray-500 md:hidden">Subtotal:</span>
                           <p className="font-medium text-blue-800">
@@ -136,7 +147,6 @@ const Cart = () => {
                           </p>
                         </div>
 
-                        {/* Remove Button */}
                         <div className="flex justify-end mt-3 md:mt-0 md:justify-center md:w-1/4">
                           <button
                             className="text-red-500 hover:text-red-700 focus:outline-none"
@@ -171,14 +181,14 @@ const Cart = () => {
 
                   <div className="flex justify-between">
                     <span className="text-gray-600">Shipping:</span>
-                    <span className="font-medium">Free</span>
+                    <span className="font-medium">RM {shippingCost.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <div className="border-t border-gray-100 pt-4 mb-6">
                   <div className="flex justify-between items-center">
                     <span className="text-gray-800 font-bold">Total:</span>
-                    <span className="text-xl font-bold text-blue-800">RM {totalPrice.toFixed(2)}</span>
+                    <span className="text-xl font-bold text-blue-800">RM {finalTotal.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -200,6 +210,8 @@ const Cart = () => {
                     state: { 
                       products: cartItems,
                       totalPrice: totalPrice,
+                      shippingCost: shippingCost,
+                      finalTotal: finalTotal,
                       totalQuantity: totalQuantity
                     }
                   })}
@@ -210,34 +222,21 @@ const Cart = () => {
             </div>
           </div>
 
-          {/* Address Change Modal */}
+          {/* Modals */}
           <Modal isModalOpen={isAddressModalOpen} setIsModalOpen={setIsAddressModalOpen}>
             <ChangeAddress setAddress={setAddress} setIsModalOpen={setIsAddressModalOpen} />
           </Modal>
 
-          {/* Checkout Modal */}
-          <Modal isModalOpen={isCheckoutModalOpen} setIsModalOpen={setIsCheckoutModalOpen}>
-            <Checkout
-              products={cartItems}
-              totalPrice={totalPrice}
-              totalQuantity={totalQuantity}
-              setOrder={setOrder}
-              setIsModalOpen={setIsCheckoutModalOpen}
-            />
-          </Modal>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12">
-          <img src={emptyCart || "/placeholder.svg"} alt="Empty Cart" className="h-64 w-auto mb-8" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">Your cart is empty</h2>
-          <p className="text-gray-600 mb-8 text-center max-w-md">
-            Looks like you haven't added any products to your cart yet.
-          </p>
-          <button
-            onClick={() => navigate("/shop")}
-            className="bg-blue-800 text-white px-6 py-3 rounded-md font-medium hover:bg-blue-700 transition-colors duration-200"
+        <div className="flex justify-center flex-col items-center min-h-[300px]">
+          <img src={emptyCart} alt="Empty Cart" className="w-80 h-80 object-contain" />
+          <p className="text-gray-500 text-lg mt-4">Your cart is empty</p>
+          <button 
+            className="mt-4 bg-blue-800 text-white px-4 py-2 rounded hover:bg-blue-500"
+            onClick={() => navigate("/")}
           >
-            Continue Shopping
+            Go to Products
           </button>
         </div>
       )}

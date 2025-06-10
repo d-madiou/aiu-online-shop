@@ -5,6 +5,7 @@ function Store({ onStoreCreated }) {
     const [sellerName, setSellerName] = useState('');
     const [storeName, setStoreName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
+    const [sellerType, setSellerType] = useState('');
     const [image, setImage] = useState(null);
     const [termsAccepted, setTermsAccepted] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -24,6 +25,7 @@ function Store({ onStoreCreated }) {
         setSellerName('');
         setStoreName('');
         setPhoneNumber('');
+        setSellerType('');
         setImage(null);
         setTermsAccepted(false);
     };
@@ -36,7 +38,7 @@ function Store({ onStoreCreated }) {
             return;
         }
 
-        if (!termsAccepted || !sellerName || !storeName || !phoneNumber || !image) {
+        if (!termsAccepted || !sellerName || !storeName || !phoneNumber || !sellerType || !image) {
             setError("Please fill all required fields and accept terms");
             return;
         }
@@ -89,6 +91,7 @@ function Store({ onStoreCreated }) {
                 .from('sellers')
                 .insert([{
                     name: sellerName,
+                    type: sellerType,
                     store_id: storeData.id,
                     user_id: user.id,
                 }]);
@@ -166,6 +169,18 @@ function Store({ onStoreCreated }) {
                         className='w-full px-3 py-2 border rounded-md'
                         required
                     />
+                </div>
+                <div>
+                    <label className='block text-xl text-gray-700'>Seller Type</label>
+                    <select
+                        value={sellerType}
+                        onChange={(e) => setSellerType(e.target.value)}
+                        className='w-full px-3 py-2 border rounded-md'
+                        required
+                    >
+                        <option value="aiu student">AIU Student</option>
+                        <option value="external seller">External Seller</option>
+                    </select>
                 </div>
                 <div>
                     <label className='block text-xl text-gray-700'>Image Profile</label>
