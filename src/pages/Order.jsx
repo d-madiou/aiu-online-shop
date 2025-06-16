@@ -17,146 +17,176 @@ const Order = () => {
   const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        setLoading(true)
+  const fetchOrder = async () => {
+    try {
+      setLoading(true)
 
-        const { data, error } = await supabase
-          .from("orders")
-          .select(`
-            *,
-            shipping_info:shipping_info_id(*)
-          `)
-          .eq("id", id)
-          .single()
+      // 1. Fetch order and shipping info
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .select(`
+          *,
+          shipping_info:shipping_info_id(*)
+        `)
+        .eq("id", id)
+        .single()
 
-        if (error) throw error
+      if (orderError) throw orderError
 
-        const { data: orderItems, error: itemsError } = await supabase
-          .from("order_items")
-          .select(`
-            *,
-            product:product_id(*)
-          `)
-          .eq("order_id", id)
+      // 2. Fetch order items
+      const { data: orderItems, error: itemsError } = await supabase
+        .from("order_items")
+        .select(`
+          *,
+          product:product_id(*)
+        `)
+        .eq("order_id", id)
 
-        if (itemsError) throw itemsError
+      if (itemsError) throw itemsError
 
-        setOrder({
-          ...data,
-          products: orderItems.map((item) => ({
-            ...item.product,
-            quantity: item.quantity,
-          })),
-          status: data.status || "pending",
-        })
-      } catch (err) {
-        console.error("Error fetching order:", err)
-        setError(err.message)
+      // 3. Fetch user email (from customers or sellers table using user_id from order)
+      const { data: user, error: userError } = await supabase
+        .from("users") // 👈 adjust this if you have separate `customers` or `sellers` tables
+        .select("email")
+        .eq("id", orderData.user_id)
+        .single()
 
-        // Mock data for demo
-        setOrder({
-          id: id || "ORD-" + Math.floor(10000 + Math.random() * 90000),
-          created_at: new Date().toISOString(),
-          total_price: 249.98,
-          payment_method: "Cash On Delivery",
-          status: "pending",
-          shipping_info: {
-            first_name: "John",
-            last_name: "Doe",
-            address: "AIU Campus, Block B",
-            phone: "+60123456789",
-          },
-          products: [
-            {
-              id: 1,
-              name: "Wireless Headphones",
-              price: 129.99,
-              quantity: 1,
-              image:
-                "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8cHJvZHVjdHxlbnwwfHwwfHx8MA%3D%3D",
-            },
-            {
-              id: 2,
-              name: "Smart Watch",
-              price: 119.99,
-              quantity: 1,
-              image:
-                "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fHByb2R1Y3R8ZW58MHx8MHx8fDA%3D",
-            },
-          ],
-        })
-      } finally {
-        setLoading(false)
+      if (userError) {
+        console.warn("User email not found:", userError.message)
       }
-    }
 
-    fetchOrder()
+      // 4. Build complete order
+      const fullOrder = {
+        ...orderData,
+        products: orderItems.map((item) => ({
+          ...item.product,
+          quantity: item.quantity,
+        })),
+        status: orderData.status || "pending",
+        user_email: user?.email || "unknown@example.com"
+      }
 
-    // Set up real-time subscription for order updates
-    const orderSubscription = supabase
-      .channel(`order-${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `id=eq.${id}`
+      setOrder(fullOrder)
+
+      // 5. Call email edge function
+      const { data: emailResponse, error: emailError } = await supabase.functions.invoke("resend-email", {
+        body: {
+          order_id: fullOrder.id,
+          customer_name: `${fullOrder.shipping_info.first_name} ${fullOrder.shipping_info.last_name}`,
+          email: fullOrder.user_email,
+          status: fullOrder.status
+        }
+      })
+
+      if (emailError) {
+        console.error("Edge function error:", emailError)
+      } else {
+        console.log("Email sent:", emailResponse)
+      }
+
+    } catch (err) {
+      console.error("Error fetching order:", err)
+      setError(err.message)
+
+      // Fallback to demo data
+      setOrder({
+        id: id || "ORD-" + Math.floor(10000 + Math.random() * 90000),
+        created_at: new Date().toISOString(),
+        total_price: 249.98,
+        payment_method: "Cash On Delivery",
+        status: "pending",
+        shipping_info: {
+          first_name: "John",
+          last_name: "Doe",
+          address: "AIU Campus, Block B",
+          phone: "+60123456789",
         },
-        (payload) => {
-          console.log('Order updated:', payload)
-          setOrder(prevOrder => {
-            if (prevOrder) {
-              return {
-                ...prevOrder,
-                ...payload.new,
-                status: payload.new.status || prevOrder.status
-              }
+        products: [
+          {
+            id: 1,
+            name: "Wireless Headphones",
+            price: 129.99,
+            quantity: 1,
+            image:
+              "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8cHJvZHVjdHxlbnwwfHwwfHx8MA%3D%3D",
+          },
+          {
+            id: 2,
+            name: "Smart Watch",
+            price: 119.99,
+            quantity: 1,
+            image:
+              "https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTB8fHByb2R1Y3R8ZW58MHx8MHx8fDA%3D",
+          },
+        ],
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  fetchOrder()
+
+  // Subscribe to real-time updates
+  const orderSubscription = supabase
+    .channel(`order-${id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'orders',
+        filter: `id=eq.${id}`
+      },
+      (payload) => {
+        console.log('Order updated:', payload)
+        setOrder(prevOrder => {
+          if (prevOrder) {
+            return {
+              ...prevOrder,
+              ...payload.new,
+              status: payload.new.status || prevOrder.status
             }
-            return prevOrder
-          })
-          
-          // Show toast notification for status changes
-          if (payload.new.status !== payload.old.status) {
-            const statusInfo = getStatusInfo(payload.new.status)
-            toast.info(`Order status updated: ${statusInfo.text}`, {
-              position: "top-center",
-              autoClose: 5000,
-            })
           }
-        }
-      )
-      .subscribe()
+          return prevOrder
+        })
 
-    // Set up real-time subscription for order deletion
-    const orderDeletionSubscription = supabase
-      .channel(`order-deletion-${id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'orders',
-          filter: `id=eq.${id}`
-        },
-        (payload) => {
-          console.log('Order deleted:', payload)
-          toast.info('Order has been removed', {
-            position: "top-center",
-            autoClose: 3000,
-          })
-          navigate("/shop", { replace: true, state: { orderDeleted: true } })
-        }
-      )
-      .subscribe()
+        const statusInfo = getStatusInfo(payload.new.status)
+        toast.info(`Order status updated: ${statusInfo.text}`, {
+          position: "top-center",
+          autoClose: 5000,
+        })
+      }
+    )
+    .subscribe()
 
-    // Cleanup subscriptions on unmount
-    return () => {
-      supabase.removeChannel(orderSubscription)
-      supabase.removeChannel(orderDeletionSubscription)
-    }
-  }, [id, navigate])
+  const orderDeletionSubscription = supabase
+    .channel(`order-deletion-${id}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'orders',
+        filter: `id=eq.${id}`
+      },
+      (payload) => {
+        console.log('Order deleted:', payload)
+        toast.info('Order has been removed', {
+          position: "top-center",
+          autoClose: 3000,
+        })
+        navigate("/shop", { replace: true, state: { orderDeleted: true } })
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(orderSubscription)
+    supabase.removeChannel(orderDeletionSubscription)
+  }
+}, [id, navigate])
+
 
   const handleClearOrder = async () => {
     const orderStatus = order.status.toLowerCase()
@@ -462,10 +492,10 @@ const Order = () => {
                       <span className="text-gray-600">Subtotal</span>
                       <span className="font-semibold">RM {order.total_price.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between">
+                    {/* <div className="flex justify-between">
                       <span className="text-gray-600">Shipping</span>
                       <span className="font-semibold text-green-600">Free</span>
-                    </div>
+                    </div> */}
                     <div className="border-t pt-3">
                       <div className="flex justify-between">
                         <span className="text-lg font-bold">Total</span>
@@ -482,13 +512,13 @@ const Order = () => {
                 {/* Action Buttons */}
                 <div className="mt-6 space-y-3">
                   <button
-                    onClick={() => navigate("/")}
+                    onClick={() => navigate("/shop")}
                     className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
                   >
                     <FaShoppingBag className="mr-2" /> Continue Shopping
                   </button>
                   <button
-                    onClick={() => navigate("/contact")}
+                    onClick={() => navigate("/about")}
                     className="w-full border border-blue-600 text-blue-600 py-3 rounded-lg hover:bg-blue-50 transition-colors"
                   >
                     Contact Support

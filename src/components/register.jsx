@@ -29,10 +29,9 @@ const Register = ({openLogin}) =>{
         } else {
           setMessage('You are registered successfully');
           openLogin()
+          alert('Please check your email for verification link');
         }
       };
-      
-
 
   return (
     <div>

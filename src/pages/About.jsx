@@ -3,32 +3,53 @@
 import { Helmet } from "react-helmet"
 import { FaCheckCircle, FaEnvelope, FaMapMarkerAlt, FaPhone, FaShieldAlt, FaShoppingBag, FaUsers } from "react-icons/fa"
 import { Link } from "react-router-dom"
+import Member1 from '../assets/team/member 1.jpg'
+import Member2 from '../assets/team/member 2.jpg'
+import Member3 from '../assets/team/member 3.jpg'
+import Member4 from '../assets/team/member 4.jpg'
+
 
 const About = () => {
+  // Team members data
+  const teamMembers = [
+    {
+      name: "Akram Ebrahim Qaid Awadh",
+      title: " Project Lead & Strategic Manager",
+      image: Member2,
+    },
+    {
+      name: "Abdullah Saleh Khamis Al-Hadri",
+      title: " Head of Technical Development",
+      image: Member1,
+    },
+    {
+      name: "Sabrin Ereet Mohamed Ereet",
+      title: " Marketing & Data Analytics Manager",
+      image: Member4,
+    },
+    {
+      name: "Abdalrawf Mohammed Mohammed Ali",
+      title: "Community Relations & Outreach Coordinator",
+      image: Member3,
+    },
+  ]
+
   return (
     <div className="bg-gray-50 min-h-screen">
       {/* SEO */}
       <Helmet>
-        <title>About Us | AIU Marketplace</title>
-        <meta
-          name="description"
-          content="Learn about AIU Marketplace - the premier online shopping platform for AIU students and faculty."
-        />
-        <meta
-          name="keywords"
-          content="AIU marketplace, about us, student marketplace, campus shopping, AIU e-commerce"
-        />
-        <link rel="canonical" href="https://aiumarketplace.com/about" />
+        <title>About AIU Business Hub</title>
+        <meta name="description" content="Connecting AIU – Creating Opportunities" />
+        <meta name="keywords" content="AIU Business Hub, about us, student aiu shop, campus shopping, AIU e-commerce" />
+        <link rel="canonical" href="https://aiubusiness.com/about" />
       </Helmet>
 
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
         <div className="container mx-auto px-4 py-16 md:py-24">
           <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6">About AIU Marketplace</h1>
-            <p className="text-xl text-blue-100">
-              Connecting the AIU community through a safe, convenient, and affordable online marketplace.
-            </p>
+            <h1 className="text-4xl md:text-5xl font-bold mb-6">About AIU Business Hub</h1>
+            <p className="text-xl text-blue-100">Connecting AIU – Creating Opportunities</p>
           </div>
         </div>
       </div>
@@ -43,26 +64,56 @@ const About = () => {
 
           <div className="prose prose-lg max-w-none text-gray-700">
             <p>
-              AIU Marketplace was born from a simple observation: students and faculty at AIU needed a better way to
-              buy, sell, and exchange goods and services within our campus community. Founded in 2023, our platform aims
-              to create a vibrant ecosystem where members of the AIU family can connect, trade, and support each other.
+              The AIU Business Hub is a student-led initiative founded by final-year Economics students at Albukhary
+              International University (AIU). The platform was created to empower the AIU entrepreneurial community by
+              offering a modern digital marketplace—a smarter alternative to traditional, unstructured e-marketing
+              methods.
             </p>
             <p>
-              What started as a small project by a group of entrepreneurial students has grown into the go-to
-              marketplace for the entire AIU community. We're proud to facilitate thousands of transactions each month,
-              helping students save money and local campus businesses thrive.
+              Our goal is to help AIU student businesses grow, increase their visibility, and reach new customer
+              segments, both within the university and beyond.
             </p>
             <p>
-              Our mission is to make campus commerce simple, safe, and sustainable. Whether you're looking for
-              textbooks, electronics, homemade food, or services, AIU Marketplace brings everything you need right to
-              your fingertips.
+              But our vision goes further. We also welcome external businesses to access the AIU student market through
+              this structured, campus-friendly digital platform. By 2030, we aspire to become one of the most
+              distinguished university-based e-commerce platforms in Kedah and Malaysia, supporting youth innovation and
+              sustainable economic development.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Our Values */}
+      {/* Our Team */}
       <div className="bg-white py-16">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">Meet Our Team</h2>
+            <div className="h-1 w-24 bg-blue-600 mx-auto"></div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+            {teamMembers.map((member, index) => (
+              <div
+                key={index}
+                className="bg-gray-50 rounded-lg p-6 text-center hover:shadow-lg transition-shadow duration-300"
+              >
+                <div className="mb-4">
+                  <img
+                    src={member.image || "/placeholder.svg"}
+                    alt={member.name}
+                    className="w-24 h-24 rounded-full mx-auto object-cover border-4 border-blue-100"
+                  />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">{member.name}</h3>
+                <p className="text-blue-600 font-medium">{member.title}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Our Values */}
+      <div className="bg-gray-50 py-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Our Values</h2>
@@ -70,7 +121,7 @@ const About = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <div className="bg-blue-50 p-6 rounded-lg text-center">
+            <div className="bg-white p-6 rounded-lg text-center shadow-sm">
               <div className="text-blue-600 text-4xl mb-4 flex justify-center">
                 <FaUsers />
               </div>
@@ -81,7 +132,7 @@ const About = () => {
               </p>
             </div>
 
-            <div className="bg-blue-50 p-6 rounded-lg text-center">
+            <div className="bg-white p-6 rounded-lg text-center shadow-sm">
               <div className="text-blue-600 text-4xl mb-4 flex justify-center">
                 <FaShieldAlt />
               </div>
@@ -92,7 +143,7 @@ const About = () => {
               </p>
             </div>
 
-            <div className="bg-blue-50 p-6 rounded-lg text-center">
+            <div className="bg-white p-6 rounded-lg text-center shadow-sm">
               <div className="text-blue-600 text-4xl mb-4 flex justify-center">
                 <FaShoppingBag />
               </div>
@@ -186,7 +237,7 @@ const About = () => {
               Start Shopping
             </Link>
             <Link
-              to="/register"
+              to="/"
               className="bg-blue-800 text-white px-8 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors"
             >
               Create Account
@@ -209,13 +260,12 @@ const About = () => {
             </div>
             <h3 className="text-lg font-bold mb-2">Visit Us</h3>
             <p className="text-gray-700">
-              AIU Campus, Student Center
+              Campus of Albukhary International University (AIU)
               <br />
-              Building B, Room 123
+              Jalan Tun Razak,
               <br />
-              Jalan University, 47500
-              <br />
-              Subang Jaya, Selangor
+              05200 Alor Setar
+              <br />, Kedah, Malaysia
             </p>
           </div>
 
@@ -228,14 +278,14 @@ const About = () => {
               General Inquiries:
               <br />
               <a href="mailto:info@aiumarketplace.com" className="text-blue-600 hover:underline">
-                info@aiumarketplace.com
+                info@aiubusinesshub.com
               </a>
               <br />
               <br />
               Support:
               <br />
               <a href="mailto:support@aiumarketplace.com" className="text-blue-600 hover:underline">
-                support@aiumarketplace.com
+                support@aiubusinesshub.com
               </a>
             </p>
           </div>
@@ -249,14 +299,14 @@ const About = () => {
               Customer Service:
               <br />
               <a href="tel:+60123456789" className="text-blue-600 hover:underline">
-                +60 12 345 6789
+                +60 11-3797 0106
               </a>
               <br />
               <br />
               Technical Support:
               <br />
               <a href="tel:+60123456780" className="text-blue-600 hover:underline">
-                +60 12 345 6780
+                +60 19-484 0468
               </a>
             </p>
           </div>

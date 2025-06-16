@@ -542,13 +542,13 @@ const Navbar = () => {
               >
                 <FaUser className="mr-3 text-indigo-500" /> About
               </Link>
-              <Link
+              {/* <Link
                 to="/others"
                 className="flex items-center py-3 border-b border-gray-100 text-gray-700 hover:text-indigo-600"
                 onClick={() => setMenuOpen(false)}
               >
                 <FaBook className="mr-3 text-indigo-500" /> Others
-              </Link>
+              </Link> */}
               {!hasStore && (
                 <button
                   onClick={() => {

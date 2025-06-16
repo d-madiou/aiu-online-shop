@@ -170,14 +170,16 @@ function Store({ onStoreCreated }) {
                         required
                     />
                 </div>
-                <div>
-                    <label className='block text-xl text-gray-700'>Seller Type</label>
+               <div>
+                <label className='block text-xl text-gray-700'>Seller Type</label>
                     <select
                         value={sellerType}
                         onChange={(e) => setSellerType(e.target.value)}
                         className='w-full px-3 py-2 border rounded-md'
                         required
                     >
+                        {/* New: Disabled, selected, and empty value option */}
+                        <option value="" disabled>Select Seller Type</option>
                         <option value="aiu student">AIU Student</option>
                         <option value="external seller">External Seller</option>
                     </select>

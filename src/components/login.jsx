@@ -17,8 +17,9 @@ const Login = ({ openSignUp, setIsModalOpen }) => {
 
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
+    
     if (error) {
-      toast.error(error.message, {
+      toast.error('Please check your email to activate your account. ' + error.message, {
         position: "top-center",
         autoClose: 5000,
       });

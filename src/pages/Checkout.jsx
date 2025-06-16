@@ -414,7 +414,7 @@ const CheckoutPage = () => {
                       </h2>
 
                       <div className="space-y-3 mb-6">
-                        <div
+                        {/* <div
                           className={`flex items-center p-4 border rounded-lg cursor-pointer hover:border-blue-500 transition-colors duration-200 bg-white ${
                             paymentMethod === "QR code" ? "border-blue-500 bg-blue-50" : ""
                           }`}
@@ -432,9 +432,9 @@ const CheckoutPage = () => {
                             <FaQrcode className="mr-3 text-blue-800" />
                             <span>QR Code Payment</span>
                           </label>
-                        </div>
+                        </div> */}
 
-                        <div
+                        {/* <div
                           className={`flex items-center p-4 border rounded-lg cursor-pointer hover:border-blue-500 transition-colors duration-200 bg-white ${
                             paymentMethod === "TouchNgo" ? "border-blue-500 bg-blue-50" : ""
                           }`}
@@ -452,7 +452,7 @@ const CheckoutPage = () => {
                             <FaMoneyBillWave className="mr-3 text-blue-800" />
                             <span>Touch 'n Go</span>
                           </label>
-                        </div>
+                        </div> */}
 
                         <div
                           className={`flex items-center p-4 border rounded-lg cursor-pointer hover:border-blue-500 transition-colors duration-200 bg-white ${
@@ -528,6 +528,7 @@ const CheckoutPage = () => {
                         Your personal data will be used to process your order, support your experience throughout this
                         website, and for other purposes described in our privacy policy.
                       </p>
+                      <p>Please contact the seller for futher payment processus</p>
                     </div>
                   </div>
                 )}
@@ -572,10 +573,7 @@ const CheckoutPage = () => {
                       <p className="text-gray-600">Subtotal ({totalQuantity} items)</p>
                       <p className="font-medium">RM {totalPrice.toFixed(2)}</p>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <p className="text-gray-600">Shipping</p>
-                      <p className="font-medium">Free</p>
-                    </div>
+                    
                   </div>
 
                   <div className="flex justify-between pt-3 border-t border-gray-200">

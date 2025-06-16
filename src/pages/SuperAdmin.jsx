@@ -83,6 +83,16 @@ function SuperAdmin() {
     fetchSuperAdminData();
   }, []);
 
+// Fetch users
+useEffect(() => {
+  const fetchUsers = async () => {
+    const { data, error } = await supabase.from('users').select('*');
+    if (!error) setUsers(data);
+  };
+  fetchUsers();
+}, []);
+
+
   const handleDeleteUser = async (userId) => {
     if (!window.confirm('Are you sure you want to delete this user?')) return;
     try {
@@ -221,7 +231,7 @@ function SuperAdmin() {
               <SuperAdminStats stats={stats} />
               <UsersTable users={users} onDeleteUser={handleDeleteUser} />
               <StoresTable stores={stores} users={users} onDeleteStore={handleDeleteStore} />
-              <SellersTable sellers={sellers} stores={stores} onDeleteSeller={handleDeleteSeller} />
+              <SellersTable sellers={sellers} users={users} stores={stores} onDeleteSeller={handleDeleteSeller} />
             </>
           )}
         </main>

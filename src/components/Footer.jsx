@@ -49,21 +49,21 @@ const Footer = () => {
               <img src={logoImage || "/placeholder.svg"} alt="AIU E-SHOP" className="h-10 w-auto" />
             </div>
             <p className="mb-6 text-gray-400">
-              For all your needs. Shop with us and experience the best online marketplace with quality products and
-              excellent service.
+               Experience the best of student-led e-commerce with trusted products and outstanding service at AIU Business Hub.
             </p>
             <div className="space-y-2">
               <div className="flex items-start">
                 <FaMapMarkerAlt className="text-blue-500 mt-1 mr-3 flex-shrink-0" />
-                <p>123 AIU Campus, Jalan University, 47500 Subang Jaya, Selangor</p>
+                <p>Albukhary International University (AIU) Campus <br />
+ Jalan Tun Razak, 05200 Alor Setar, Kedah, Malaysia</p>
               </div>
               <div className="flex items-center">
                 <FaPhone className="text-blue-500 mr-3 flex-shrink-0" />
-                <p>+60 12 345 6789</p>
+                <p>+60 11-3797 0106</p>
               </div>
               <div className="flex items-center">
                 <FaEnvelope className="text-blue-500 mr-3 flex-shrink-0" />
-                <p>info@aiueshop.com</p>
+                <p>info@aiubusinesshub.com</p>
               </div>
             </div>
           </div>
@@ -210,13 +210,7 @@ const Footer = () => {
             {/* Social Media */}
             <h3 className="text-lg font-bold mt-8 mb-4 text-white">Follow Us</h3>
             <div className="flex space-x-4">
-              <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-600 transition-colors duration-300"
-                aria-label="Facebook"
-              >
-                <FaFacebook />
-              </a>
+              
               <a
                 href="#"
                 className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-pink-600 transition-colors duration-300"
@@ -224,20 +218,7 @@ const Footer = () => {
               >
                 <FaInstagram />
               </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-blue-400 transition-colors duration-300"
-                aria-label="Twitter"
-              >
-                <FaTwitter />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-black transition-colors duration-300"
-                aria-label="TikTok"
-              >
-                <FaTiktok />
-              </a>
+              
               <a
                 href="#"
                 className="w-10 h-10 bg-gray-800 rounded-full flex items-center justify-center hover:bg-green-600 transition-colors duration-300"
@@ -253,21 +234,21 @@ const Footer = () => {
       {/* Bottom Footer */}
       <div className="border-t border-gray-800 py-6">
         <div className="container mx-auto px-4 md:px-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-sm text-gray-500">&copy; {new Date().getFullYear()} AIU E-SHOP. All rights reserved.</p>
+          <p className="text-sm text-gray-500">&copy; {new Date().getFullYear()} AIU business hub. Developed by TECHNEXUS TEAM</p>
           <div className="mt-4 md:mt-0">
             <ul className="flex space-x-6 text-sm">
               <li>
-                <Link to="/privacy" className="text-gray-500 hover:text-blue-500 transition-colors duration-200">
+                <Link to="/policy" className="text-gray-500 hover:text-blue-500 transition-colors duration-200">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="/terms" className="text-gray-500 hover:text-blue-500 transition-colors duration-200">
+                <Link to="/policy" className="text-gray-500 hover:text-blue-500 transition-colors duration-200">
                   Terms of Service
                 </Link>
               </li>
               <li>
-                <Link to="/shipping" className="text-gray-500 hover:text-blue-500 transition-colors duration-200">
+                <Link to="/policy" className="text-gray-500 hover:text-blue-500 transition-colors duration-200">
                   Shipping Policy
                 </Link>
               </li>

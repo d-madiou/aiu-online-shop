@@ -15,7 +15,7 @@ const Cart = () => {
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false)
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false)
   const [order, setOrder] = useState(null)
-  const [shippingCost, setShippingCost] = useState(0)
+  const [totalShippingCost, setTotalShippingCost] = useState(0)
   const navigate = useNavigate()
 
   // Fetch cart items from Supabase
@@ -23,25 +23,59 @@ const Cart = () => {
     const user = await supabase.auth.getUser()
     if (!user?.data?.user?.id) return
 
-    const { data, error } = await supabase.from("cart").select("*").eq("user_id", user.data.user.id)
-    if (!error) setCartItems(data)
-  }
-
-  // Fetch shipping cost from products
-  const fetchShippingCost = async () => {
-    const { data, error } = await supabase.from("products").select("shipping_cost").single()
-    if (!error) return data.shipping_cost || 0
-    return 0
-  }
-
-  useEffect(() => {
-    const fetchShipping = async () => {
-      const cost = await fetchShippingCost()
-      setShippingCost(cost)
-      setAddress(prev => `${prev} (Shipping Cost: RM ${cost.toFixed(2)})`)
+    // First, get cart items
+    const { data: cartData, error: cartError } = await supabase
+      .from("cart")
+      .select("*")
+      .eq("user_id", user.data.user.id)
+    
+    if (cartError || !cartData) {
+      console.error("Error fetching cart:", cartError)
+      return
     }
-    fetchShipping()
-  }, [])
+
+    if (cartData.length === 0) {
+      setCartItems([])
+      setTotalShippingCost(0)
+      return
+    }
+
+    // Get product IDs from cart items
+    const productIds = cartData.map(item => item.product_id)
+    
+    // Fetch product details including shipping cost
+    const { data: productsData, error: productsError } = await supabase
+      .from("products")
+      .select("id, name, price, image, category, shipping_cost")
+      .in("id", productIds)
+    
+    if (productsError) {
+      console.error("Error fetching products:", productsError)
+      return
+    }
+
+    // Merge cart items with product details
+    const mergedCartItems = cartData.map(cartItem => {
+      const product = productsData.find(p => p.id === cartItem.product_id)
+      return {
+        ...cartItem,
+        name: product?.name || cartItem.name || "Unknown Product",
+        price: product?.price || cartItem.price || 0,
+        image: product?.image || cartItem.image || "",
+        category: product?.category || cartItem.category || "",
+        shipping_cost: product?.shipping_cost || 0
+      }
+    })
+    
+    setCartItems(mergedCartItems)
+    
+    // Calculate total shipping cost (fixed per product, not multiplied by quantity)
+    const shippingTotal = mergedCartItems.reduce((sum, item) => {
+      return sum + item.shipping_cost
+    }, 0)
+    
+    setTotalShippingCost(shippingTotal)
+  }
 
   useEffect(() => {
     fetchCart()
@@ -72,7 +106,7 @@ const Cart = () => {
 
   const totalPrice = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
   const totalQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0)
-  const finalTotal = totalPrice + shippingCost
+  const finalTotal = totalPrice + totalShippingCost
 
   return (
     <div className="container mx-auto py-8 min-h-screen px-4 md:px-8 lg:px-16">
@@ -89,10 +123,11 @@ const Cart = () => {
                 <div className="hidden md:flex justify-between border-b border-gray-100 bg-gray-50 p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
                   <p className="w-2/5">Product</p>
                   <div className="w-3/5 flex">
-                    <p className="w-1/4 text-center">Price</p>
-                    <p className="w-1/4 text-center">Quantity</p>
-                    <p className="w-1/4 text-center">Subtotal</p>
-                    <p className="w-1/4 text-center">Remove</p>
+                    <p className="w-1/5 text-center">Price</p>
+                    <p className="w-1/5 text-center">Quantity</p>
+                    <p className="w-1/5 text-center">Shipping</p>
+                    <p className="w-1/5 text-center">Subtotal</p>
+                    <p className="w-1/5 text-center">Remove</p>
                   </div>
                 </div>
 
@@ -115,11 +150,11 @@ const Cart = () => {
                       </div>
 
                       <div className="md:w-3/5 flex flex-col md:flex-row md:items-center">
-                        <div className="hidden md:block md:w-1/4 text-center">
+                        <div className="hidden md:block md:w-1/5 text-center">
                           <p className="text-gray-900 font-medium">RM {product.price.toFixed(2)}</p>
                         </div>
 
-                        <div className="flex items-center justify-between md:justify-center md:w-1/4">
+                        <div className="flex items-center justify-between md:justify-center md:w-1/5">
                           <span className="text-sm text-gray-500 mr-2 md:hidden">Quantity:</span>
                           <div className="flex items-center border border-gray-200 rounded-md">
                             <button
@@ -140,14 +175,21 @@ const Cart = () => {
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between mt-3 md:mt-0 md:justify-center md:w-1/4">
+                        <div className="flex items-center justify-between mt-3 md:mt-0 md:justify-center md:w-1/5">
+                          <span className="text-sm text-gray-500 md:hidden">Shipping:</span>
+                          <p className="text-gray-600 text-sm">
+                            RM {product.shipping_cost.toFixed(2)}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center justify-between mt-3 md:mt-0 md:justify-center md:w-1/5">
                           <span className="text-sm text-gray-500 md:hidden">Subtotal:</span>
                           <p className="font-medium text-blue-800">
                             RM {(product.price * product.quantity).toFixed(2)}
                           </p>
                         </div>
 
-                        <div className="flex justify-end mt-3 md:mt-0 md:justify-center md:w-1/4">
+                        <div className="flex justify-end mt-3 md:mt-0 md:justify-center md:w-1/5">
                           <button
                             className="text-red-500 hover:text-red-700 focus:outline-none"
                             onClick={() => handleRemove(product.id)}
@@ -180,8 +222,8 @@ const Cart = () => {
                   </div>
 
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Shipping:</span>
-                    <span className="font-medium">RM {shippingCost.toFixed(2)}</span>
+                    <span className="text-gray-600">Total Shipping:</span>
+                    <span className="font-medium">RM {totalShippingCost.toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -192,25 +234,13 @@ const Cart = () => {
                   </div>
                 </div>
 
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-600 mb-2">Shipping Address:</h3>
-                  <div className="flex justify-between items-center">
-                    <p className="text-gray-800">{address}</p>
-                    <button
-                      className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                      onClick={() => setIsAddressModalOpen(true)}
-                    >
-                      Change
-                    </button>
-                  </div>
-                </div>
                 <button 
                   className='w-full bg-blue-800 text-white py-2 hover:bg-blue-500'
                   onClick={() => navigate("/checkout", { 
                     state: { 
                       products: cartItems,
                       totalPrice: totalPrice,
-                      shippingCost: shippingCost,
+                      shippingCost: totalShippingCost,
                       finalTotal: finalTotal,
                       totalQuantity: totalQuantity
                     }
